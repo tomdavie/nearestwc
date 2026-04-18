@@ -20,6 +20,7 @@ function Profile() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loggingOut, setLoggingOut] = useState(false)
   const [pointsRow, setPointsRow] = useState(null)
   const [toiletsAdded, setToiletsAdded] = useState(0)
   const [reviewsLeft, setReviewsLeft] = useState(0)
@@ -110,6 +111,13 @@ function Profile() {
     return Math.min(100, Math.max(4, (num / denom) * 100))
   }, [progress, points, level])
 
+  const handleLogout = async () => {
+    setLoggingOut(true)
+    await supabase.auth.signOut()
+    setLoggingOut(false)
+    navigate('/login')
+  }
+
   if (loading && !user) {
     return (
       <div className={styles.page}>
@@ -141,6 +149,14 @@ function Profile() {
         ) : (
           <p className={styles.progressCaption}>Peak porcelain. No higher throne. Yet.</p>
         )}
+        <button
+          type="button"
+          className={styles.logoutBtn}
+          onClick={handleLogout}
+          disabled={loggingOut}
+        >
+          {loggingOut ? 'Logging out…' : 'Log out'}
+        </button>
       </div>
 
       <h2 className={styles.sectionTitle}>Your contribution to humanity</h2>

@@ -48,6 +48,13 @@
   margin-top: 14px;
 }
 
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 .field {
   width: 100%;
   padding: 14px 16px;
@@ -196,6 +203,80 @@
 .textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18);
+}
+
+.hoursGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.hoursGridDisabled {
+  opacity: 0.6;
+}
+
+.dayRow {
+  display: grid;
+  gap: 8px;
+}
+
+.dayToggle {
+  justify-self: start;
+  min-width: 52px;
+  padding: 10px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.dayToggleActive {
+  background: rgba(26, 115, 232, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.dayToggle:disabled {
+  cursor: not-allowed;
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeSelect {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.timeSelect:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18);
+}
+
+.timeDivider {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.scheduleNote {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
 .celebrateOverlay {

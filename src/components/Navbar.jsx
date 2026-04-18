@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { fetchUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
@@ -81,6 +81,11 @@ function Navbar() {
   }, [])
 
   const levelEmoji = points != null ? getLevelFromPoints(points).emoji : ''
+  const accountHref = sessionUser ? '/profile' : '/login'
+  const accountLabel = useMemo(
+    () => (sessionUser ? 'Profile' : 'Login'),
+    [sessionUser],
+  )
 
   return (
     <header className={styles.nav}>
@@ -105,9 +110,9 @@ function Navbar() {
               {levelEmoji} {points}pts
             </Link>
           )}
-          <Link to="/login" className={styles.iconLink} title="Account">
+          <Link to={accountHref} className={styles.iconLink} title={accountLabel}>
             <IconUser />
-            <span className={styles.srOnly}>Login</span>
+            <span className={styles.srOnly}>{accountLabel}</span>
           </Link>
         </div>
       </div>

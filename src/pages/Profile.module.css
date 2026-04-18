@@ -52,6 +52,30 @@
   font-weight: 500;
 }
 
+.logoutBtn {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.logoutBtn:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-color: rgba(26, 115, 232, 0.3);
+}
+
+.logoutBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .sectionTitle {
   font-size: 15px;
   font-weight: 700;

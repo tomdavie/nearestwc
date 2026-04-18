@@ -7,6 +7,23 @@ import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
 
+function getMarkerColor(averageRating) {
+  if (averageRating == null) return '#9aa0a6'
+  if (averageRating <= 2) return '#d93025'
+  if (averageRating < 4) return '#f9ab00'
+  return '#188038'
+}
+
+function createMarkerIcon(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
+      <circle cx="21" cy="21" r="18" fill="${color}" stroke="white" stroke-width="3" />
+      <text x="21" y="25" text-anchor="middle" font-size="18">🚻</text>
+    </svg>
+  `
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
 function SearchIcon() {
   return (
     <span className={styles.searchIcon} aria-hidden>
@@ -42,8 +59,35 @@ function MapView() {
 
   useEffect(() => {
     const fetchToilets = async () => {
-      const { data, error } = await supabase.from('toilets').select('*')
-      if (!error) setToilets(data)
+      const [{ data: toiletsData, error: toiletsError }, { data: reviewsData, error: reviewsError }] =
+        await Promise.all([
+          supabase.from('toilets').select('*'),
+          supabase.from('reviews').select('toilet_id, overall_rating, rating'),
+        ])
+
+      if (toiletsError) return
+
+      const averages = {}
+      if (!reviewsError) {
+        for (const review of reviewsData || []) {
+          const score = Number(review.overall_rating ?? review.rating)
+          if (!review.toilet_id || !score) continue
+          const current = averages[review.toilet_id] || { total: 0, count: 0 }
+          current.total += score
+          current.count += 1
+          averages[review.toilet_id] = current
+        }
+      }
+
+      setToilets(
+        (toiletsData || []).map((toilet) => {
+          const rating = averages[toilet.id]
+          return {
+            ...toilet,
+            average_rating: rating ? rating.total / rating.count : null,
+          }
+        }),
+      )
     }
     fetchToilets()
   }, [])
@@ -95,6 +139,11 @@ function MapView() {
             key={toilet.id}
             position={{ lat: toilet.lat, lng: toilet.lng }}
             onClick={() => setSelected(toilet)}
+            icon={{
+              url: createMarkerIcon(getMarkerColor(toilet.average_rating)),
+              scaledSize: new window.google.maps.Size(42, 42),
+              anchor: new window.google.maps.Point(21, 21),
+            }}
           />
         ))}
 

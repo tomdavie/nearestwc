@@ -7,10 +7,22 @@ import { useToast } from '../context/useToast'
 import styles from './AddToilet.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hours = String(Math.floor(i / 2)).padStart(2, '0')
+  const minutes = i % 2 === 0 ? '00' : '30'
+  return `${hours}:${minutes}`
+})
+
+const defaultSchedule = DAYS.reduce((acc, day) => {
+  acc[day] = { enabled: false, open: '09:00', close: '17:00' }
+  return acc
+}, {})
 
 function AddToilet() {
   const [name, setName] = useState('')
-  const [openingHours, setOpeningHours] = useState('')
+  const [isTwentyFourHours, setIsTwentyFourHours] = useState(false)
+  const [openingHours, setOpeningHours] = useState(defaultSchedule)
   const [accessCode, setAccessCode] = useState('')
   const [description, setDescription] = useState('')
   const [position, setPosition] = useState(null)
@@ -56,6 +68,26 @@ function AddToilet() {
     }
   }, [])
 
+  const handleDayToggle = (day) => {
+    setOpeningHours((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled,
+      },
+    }))
+  }
+
+  const handleDayTimeChange = (day, key, value) => {
+    setOpeningHours((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [key]: value,
+      },
+    }))
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!user) {
@@ -66,6 +98,19 @@ function AddToilet() {
       showToast('Wait for your location or move the map pin.', 'info')
       return
     }
+    const openingHoursPayload = isTwentyFourHours
+      ? { mode: '24_7' }
+      : {
+          mode: 'scheduled',
+          closed_on_unlisted_days: true,
+          days: DAYS.filter((day) => openingHours[day].enabled).reduce((acc, day) => {
+            acc[day] = {
+              open: openingHours[day].open,
+              close: openingHours[day].close,
+            }
+            return acc
+          }, {}),
+        }
     setSubmitting(true)
     const { error } = await supabase.from('toilets').insert([
       {
@@ -78,7 +123,7 @@ function AddToilet() {
         requires_key: requiresKey,
         gender_neutral: genderNeutral,
         baby_changing: babyChanging,
-        opening_hours: openingHours.trim() || null,
+        opening_hours: JSON.stringify(openingHoursPayload),
         access_code: accessCode.trim() || null,
         description: description.trim() || null,
       },
@@ -146,18 +191,63 @@ function AddToilet() {
         </div>
 
         <div className={styles.card}>
-          <label className={styles.cardLabel} htmlFor="wc-hours">
+          <span className={styles.cardLabel}>
             Opening hours
+          </span>
+          <label className={styles.toggleRow}>
+            <input
+              className={styles.checkbox}
+              type="checkbox"
+              checked={isTwentyFourHours}
+              onChange={(e) => setIsTwentyFourHours(e.target.checked)}
+            />
+            <span className={styles.optionText}>
+              <span className={styles.optionTitle}>24 hours</span>
+              <span className={styles.optionDesc}>If it never sleeps, neither must this schedule.</span>
+            </span>
           </label>
-          <input
-            id="wc-hours"
-            className={styles.field}
-            type="text"
-            placeholder="e.g. Mon-Sun 8am-8pm or 24 hours"
-            value={openingHours}
-            onChange={(e) => setOpeningHours(e.target.value)}
-            autoComplete="off"
-          />
+          <div className={`${styles.hoursGrid} ${isTwentyFourHours ? styles.hoursGridDisabled : ''}`}>
+            {DAYS.map((day) => (
+              <div key={day} className={styles.dayRow}>
+                <button
+                  type="button"
+                  className={`${styles.dayToggle} ${openingHours[day].enabled ? styles.dayToggleActive : ''}`}
+                  onClick={() => handleDayToggle(day)}
+                  disabled={isTwentyFourHours}
+                >
+                  {day}
+                </button>
+                {openingHours[day].enabled && !isTwentyFourHours && (
+                  <div className={styles.timeRow}>
+                    <select
+                      className={styles.timeSelect}
+                      value={openingHours[day].open}
+                      onChange={(e) => handleDayTimeChange(day, 'open', e.target.value)}
+                    >
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={`${day}-open-${time}`} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                    </select>
+                    <span className={styles.timeDivider}>to</span>
+                    <select
+                      className={styles.timeSelect}
+                      value={openingHours[day].close}
+                      onChange={(e) => handleDayTimeChange(day, 'close', e.target.value)}
+                    >
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={`${day}-close-${time}`} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className={styles.scheduleNote}>Closed on all days not listed.</p>
           <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-code">
             Access code
           </label>
