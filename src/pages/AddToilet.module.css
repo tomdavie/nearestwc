@@ -214,15 +214,15 @@
   opacity: 0.6;
 }
 
-.dayRow {
-  display: grid;
+.daysRow {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .dayToggle {
-  justify-self: start;
-  min-width: 52px;
-  padding: 10px 12px;
+  min-width: 44px;
+  padding: 8px 12px;
   border-radius: var(--radius-full);
   border: 1px solid var(--color-border);
   background: #fff;
@@ -243,10 +243,22 @@
   cursor: not-allowed;
 }
 
+.inlineTimes {
+  display: grid;
+  gap: 8px;
+}
+
 .timeRow {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.dayInlineLabel {
+  min-width: 30px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
 }
 
 .timeSelect {
@@ -277,6 +289,42 @@
   font-size: 13px;
   color: var(--color-text-muted);
   line-height: 1.4;
+}
+
+.paymentBlock {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.paymentToggleRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.paymentToggle {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--color-text-secondary);
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.paymentToggleActive {
+  background: rgba(26, 115, 232, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.paidFields {
+  margin-top: 10px;
 }
 
 .celebrateOverlay {

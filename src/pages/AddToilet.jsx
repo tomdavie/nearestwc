@@ -27,9 +27,11 @@ function AddToilet() {
   const [description, setDescription] = useState('')
   const [position, setPosition] = useState(null)
   const [isFree, setIsFree] = useState(true)
+  const [cost, setCost] = useState('')
+  const [acceptsCash, setAcceptsCash] = useState(false)
+  const [acceptsCard, setAcceptsCard] = useState(false)
   const [isAccessible, setIsAccessible] = useState(false)
   const [requiresKey, setRequiresKey] = useState(false)
-  const [genderNeutral, setGenderNeutral] = useState(false)
   const [babyChanging, setBabyChanging] = useState(false)
   const [user, setUser] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -88,6 +90,8 @@ function AddToilet() {
     }))
   }
 
+  const selectedDays = DAYS.filter((day) => openingHours[day].enabled)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!user) {
@@ -119,9 +123,11 @@ function AddToilet() {
         lng: position.lng,
         added_by: user.id,
         is_free: isFree,
+        cost: isFree ? null : cost.trim() || null,
+        accepts_cash: isFree ? false : acceptsCash,
+        accepts_card: isFree ? false : acceptsCard,
         is_accessible: isAccessible,
         requires_key: requiresKey,
-        gender_neutral: genderNeutral,
         baby_changing: babyChanging,
         opening_hours: JSON.stringify(openingHoursPayload),
         access_code: accessCode.trim() || null,
@@ -207,9 +213,10 @@ function AddToilet() {
             </span>
           </label>
           <div className={`${styles.hoursGrid} ${isTwentyFourHours ? styles.hoursGridDisabled : ''}`}>
-            {DAYS.map((day) => (
-              <div key={day} className={styles.dayRow}>
+            <div className={styles.daysRow}>
+              {DAYS.map((day) => (
                 <button
+                  key={day}
                   type="button"
                   className={`${styles.dayToggle} ${openingHours[day].enabled ? styles.dayToggleActive : ''}`}
                   onClick={() => handleDayToggle(day)}
@@ -217,8 +224,13 @@ function AddToilet() {
                 >
                   {day}
                 </button>
-                {openingHours[day].enabled && !isTwentyFourHours && (
-                  <div className={styles.timeRow}>
+              ))}
+            </div>
+            {!isTwentyFourHours && selectedDays.length > 0 && (
+              <div className={styles.inlineTimes}>
+                {selectedDays.map((day) => (
+                  <div key={`time-${day}`} className={styles.timeRow}>
+                    <span className={styles.dayInlineLabel}>{day}</span>
                     <select
                       className={styles.timeSelect}
                       value={openingHours[day].open}
@@ -243,9 +255,9 @@ function AddToilet() {
                       ))}
                     </select>
                   </div>
-                )}
+                ))}
               </div>
-            ))}
+            )}
           </div>
           <p className={styles.scheduleNote}>Closed on all days not listed.</p>
           <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-code">
@@ -308,18 +320,59 @@ function AddToilet() {
 
         <div className={styles.card}>
           <span className={styles.cardLabel}>Details</span>
-          <label className={styles.option}>
-            <input
-              className={styles.checkbox}
-              type="checkbox"
-              checked={isFree}
-              onChange={(e) => setIsFree(e.target.checked)}
-            />
-            <span className={styles.optionText}>
-              <span className={styles.optionTitle}>Free to use</span>
-              <span className={styles.optionDesc}>No payment required</span>
-            </span>
-          </label>
+          <div className={styles.paymentBlock}>
+            <p className={styles.optionTitle}>Payment</p>
+            <div className={styles.paymentToggleRow}>
+              <button
+                type="button"
+                className={`${styles.paymentToggle} ${isFree ? styles.paymentToggleActive : ''}`}
+                onClick={() => setIsFree(true)}
+              >
+                Free to use
+              </button>
+              <button
+                type="button"
+                className={`${styles.paymentToggle} ${!isFree ? styles.paymentToggleActive : ''}`}
+                onClick={() => setIsFree(false)}
+              >
+                Paid
+              </button>
+            </div>
+            {!isFree && (
+              <div className={styles.paidFields}>
+                <input
+                  className={styles.field}
+                  type="text"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  placeholder="e.g. £0.50"
+                  autoComplete="off"
+                />
+                <label className={styles.option}>
+                  <input
+                    className={styles.checkbox}
+                    type="checkbox"
+                    checked={acceptsCash}
+                    onChange={(e) => setAcceptsCash(e.target.checked)}
+                  />
+                  <span className={styles.optionText}>
+                    <span className={styles.optionTitle}>Cash accepted</span>
+                  </span>
+                </label>
+                <label className={styles.option}>
+                  <input
+                    className={styles.checkbox}
+                    type="checkbox"
+                    checked={acceptsCard}
+                    onChange={(e) => setAcceptsCard(e.target.checked)}
+                  />
+                  <span className={styles.optionText}>
+                    <span className={styles.optionTitle}>Card accepted</span>
+                  </span>
+                </label>
+              </div>
+            )}
+          </div>
           <label className={styles.option}>
             <input
               className={styles.checkbox}
@@ -342,18 +395,6 @@ function AddToilet() {
             <span className={styles.optionText}>
               <span className={styles.optionTitle}>Key or code required</span>
               <span className={styles.optionDesc}>Staff, radar key, or door code</span>
-            </span>
-          </label>
-          <label className={styles.option}>
-            <input
-              className={styles.checkbox}
-              type="checkbox"
-              checked={genderNeutral}
-              onChange={(e) => setGenderNeutral(e.target.checked)}
-            />
-            <span className={styles.optionText}>
-              <span className={styles.optionTitle}>All-gender</span>
-              <span className={styles.optionDesc}>Not split into binary men or women only</span>
             </span>
           </label>
           <label className={styles.option}>
