@@ -264,6 +264,25 @@
   cursor: pointer;
 }
 
+.directionsBtn {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #fff;
+  color: var(--color-text-secondary);
+  margin-left: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.savedNote {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .reportArea {
   margin-top: 16px;
   border-top: 1px solid var(--color-border-light);

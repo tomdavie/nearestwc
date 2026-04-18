@@ -97,7 +97,14 @@ function ToiletDetail({ toilet, onClose, user }) {
   const [submittingReport, setSubmittingReport] = useState(false)
   const [modalPhoto, setModalPhoto] = useState('')
   const [savingToilet, setSavingToilet] = useState(false)
+  const [savedThisToilet, setSavedThisToilet] = useState(false)
   const dragStartY = useRef(null)
+
+  useEffect(() => {
+    if (!toilet?.id) return
+    const key = `nwc_saved_toilet_${toilet.id}`
+    setSavedThisToilet(window.sessionStorage.getItem(key) === '1')
+  }, [toilet?.id])
 
   const requestClose = useCallback(() => {
     if (exiting) return
@@ -343,6 +350,7 @@ function ToiletDetail({ toilet, onClose, user }) {
   }
 
   const markSavedMe = async () => {
+    if (savedThisToilet) return
     if (!toilet?.id || !toilet?.added_by || !user) {
       if (!user) showToast('Login to save this WC.', 'info')
       return
@@ -356,12 +364,21 @@ function ToiletDetail({ toilet, onClose, user }) {
       return
     }
     toilet.saves_count = next
+    const key = `nwc_saved_toilet_${toilet.id}`
+    window.sessionStorage.setItem(key, '1')
+    setSavedThisToilet(true)
     try {
       await incrementUserPoints(toilet.added_by, 2)
     } catch (err) {
       showToast(err?.message || 'Saved, but points award failed.', 'error')
     }
     showToast('Saved! Community points delivered. 🙌', 'success')
+  }
+
+  const openDirections = () => {
+    if (toilet?.lat == null || toilet?.lng == null) return
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${toilet.lat},${toilet.lng}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const handleShare = async () => {
@@ -480,9 +497,18 @@ function ToiletDetail({ toilet, onClose, user }) {
           <button type="button" className={styles.shareBtn} onClick={handleShare}>
             🔗 Share this WC
           </button>
-          <button type="button" className={styles.savedBtn} onClick={markSavedMe} disabled={savingToilet}>
-            {savingToilet ? 'Saving…' : '🙌 This saved me'}
+          <button type="button" className={styles.directionsBtn} onClick={openDirections}>
+            🗺️ Get directions
           </button>
+          <button
+            type="button"
+            className={styles.savedBtn}
+            onClick={markSavedMe}
+            disabled={savingToilet || savedThisToilet}
+          >
+            {savedThisToilet ? 'Saved! 🙌 Thanks' : savingToilet ? 'Saving…' : '🙌 This saved me'}
+          </button>
+          {savedThisToilet && <p className={styles.savedNote}>+2 points awarded to the person who added this WC</p>}
 
           {tags.length > 0 && (
             <div className={styles.tags}>

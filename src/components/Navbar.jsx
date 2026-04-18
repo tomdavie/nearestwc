@@ -82,10 +82,7 @@ function Navbar() {
 
   const levelEmoji = points != null ? getLevelFromPoints(points).emoji : ''
   const accountHref = sessionUser ? '/profile' : '/login'
-  const accountLabel = useMemo(
-    () => (sessionUser ? 'Profile' : 'Login'),
-    [sessionUser],
-  )
+  const accountLabel = useMemo(() => (sessionUser ? 'Profile' : 'Login'), [sessionUser])
 
   return (
     <header className={styles.nav}>
@@ -100,21 +97,20 @@ function Navbar() {
           <IconPlus />
           <span className={styles.srOnly}>Add WC</span>
         </Link>
-        <div className={styles.accountCluster}>
-          {sessionUser && points != null && (
-            <Link
-              to="/profile"
-              className={styles.pointsBadge}
-              aria-label={`Profile and points, ${points} points`}
-            >
-              {levelEmoji} {points}pts
-            </Link>
-          )}
+        {sessionUser && points != null ? (
+          <Link
+            to="/profile"
+            className={styles.pointsBadge}
+            aria-label={`Profile and points, ${points} points`}
+          >
+            {levelEmoji} {points}pts
+          </Link>
+        ) : (
           <Link to={accountHref} className={styles.iconLink} title={accountLabel}>
             <IconUser />
             <span className={styles.srOnly}>{accountLabel}</span>
           </Link>
-        </div>
+        )}
       </div>
     </header>
   )

@@ -17,8 +17,8 @@ function getMarkerColor(averageRating) {
 function createMarkerIcon(color) {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
-      <circle cx="21" cy="21" r="18" fill="${color}" stroke="white" stroke-width="3" />
-      <text x="21" y="25" text-anchor="middle" font-size="18">🚻</text>
+      <circle cx="21" cy="21" r="18" fill="${color}" stroke="#ffffff" stroke-width="3" />
+      <text x="21" y="25" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff" font-family="Arial, sans-serif">WC</text>
     </svg>
   `
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
@@ -152,6 +152,33 @@ function MapView() {
     )
   }
 
+  const clusterOptions = useMemo(() => {
+    if (!window.google?.maps) return undefined
+    return {
+      renderer: {
+        render: ({ count, position }) =>
+          new window.google.maps.Marker({
+            position,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              fillColor: '#1a73e8',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+              scale: 18,
+            },
+            label: {
+              text: String(count),
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: '700',
+            },
+            zIndex: Number(window.google.maps.Marker.MAX_ZINDEX) + count,
+          }),
+      },
+    }
+  }, [isLoaded])
+
   const handleSearch = (e) => {
     e.preventDefault()
     const q = searchText.trim()
@@ -194,7 +221,7 @@ function MapView() {
           zoomControl: true,
         }}
       >
-        <MarkerClustererF>
+        <MarkerClustererF options={clusterOptions}>
           {(clusterer) =>
             filtered.map((toilet) => (
               <Marker
@@ -224,7 +251,9 @@ function MapView() {
       )}
 
       <button type="button" className={styles.locateBtn} onClick={locateMe} title="Locate me">
-        🎯
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden>
+          <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06z" />
+        </svg>
       </button>
 
       <div className={styles.floatingBar}>
