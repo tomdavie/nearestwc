@@ -29,10 +29,18 @@ function Upgrade() {
       navigate('/login')
       return
     }
+    if (!import.meta.env.VITE_STRIPE_PAYMENT_LINK?.trim()) {
+      setLoading(false)
+      showToast(
+        'Payment link is not loaded. Add VITE_STRIPE_PAYMENT_LINK (your Stripe Payment Link URL) to `.env` and restart the dev server.',
+        'error',
+      )
+      return
+    }
     try {
-      await startProCheckout(user.id)
+      startProCheckout()
     } catch (err) {
-      showToast(err?.message || 'Could not start checkout right now.', 'error')
+      showToast(err?.message || 'Could not open checkout right now.', 'error')
       setLoading(false)
     }
   }

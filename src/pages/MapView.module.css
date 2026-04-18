@@ -172,3 +172,14 @@
   transform: translateY(-1px);
   box-shadow: var(--shadow-float);
 }
+
+/* MarkerClustererPlus cluster div — disable any inherited pulse/animation */
+:global(.nwcMapCluster) {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+:global(.nwcMapCluster img) {
+  box-shadow: none;
+  filter: none;
+}

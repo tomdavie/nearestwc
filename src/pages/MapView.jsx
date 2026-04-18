@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { GoogleMap, useJsApiLoader, Marker, MarkerClustererF } from '@react-google-maps/api'
 import { supabase } from '../supabaseClient'
@@ -15,11 +15,30 @@ function getMarkerColor(averageRating) {
   return '#188038'
 }
 
-function createMarkerIcon(color) {
+/** Solid rating-coloured circle + 🚻 (no stroke — avoids the grey “ring” look). */
+function createToiletMarkerIconUrl(color) {
+  const size = 40
+  const r = 18
+  const cx = size / 2
+  const cy = size / 2
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
-      <circle cx="21" cy="21" r="18" fill="${color}" stroke="#ffffff" stroke-width="3" />
-      <text x="21" y="25" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff" font-family="Arial, sans-serif">WC</text>
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>
+      <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-size="15" dominant-baseline="middle">🚻</text>
+    </svg>
+  `
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
+/** Single solid blue disk for MarkerClustererPlus — text is drawn by the clusterer, not baked into the image. */
+function createClusterBackgroundIconUrl() {
+  const size = 48
+  const r = 20
+  const cx = size / 2
+  const cy = size / 2
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#1a73e8"/>
     </svg>
   `
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
@@ -153,32 +172,36 @@ function MapView() {
     )
   }
 
-  const clusterOptions = useMemo(() => {
-    if (!window.google?.maps) return undefined
-    return {
-      renderer: {
-        render: ({ count, position }) =>
-          new window.google.maps.Marker({
-            position,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              fillColor: '#1a73e8',
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-              scale: 18,
-            },
-            label: {
-              text: String(count),
-              color: '#ffffff',
-              fontSize: '12px',
-              fontWeight: '700',
-            },
-            zIndex: Number(window.google.maps.Marker.MAX_ZINDEX) + count,
-          }),
+  /**
+   * @react-google-maps/marker-clusterer uses `styles` + `calculator` (not `options.renderer`).
+   * Default m1/m2 PNGs look like “sonar” rings — we use one flat SVG + white count text.
+   */
+  const clusterStyles = useMemo(() => {
+    const url = createClusterBackgroundIconUrl()
+    const w = 48
+    const h = 48
+    return [
+      {
+        url,
+        width: w,
+        height: h,
+        textColor: '#ffffff',
+        textSize: 14,
+        fontWeight: 'bold',
+        fontFamily: 'Arial,sans-serif',
+        anchorText: [0, 0],
       },
-    }
-  }, [isLoaded])
+    ]
+  }, [])
+
+  const clusterCalculator = useCallback(
+    (markers, _numStyles) => ({
+      text: String(markers.length),
+      index: 1,
+      title: '',
+    }),
+    [],
+  )
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -222,7 +245,12 @@ function MapView() {
           zoomControl: true,
         }}
       >
-        <MarkerClustererF options={clusterOptions}>
+        <MarkerClustererF
+          clusterClass="nwcMapCluster"
+          enableRetinaIcons
+          styles={clusterStyles}
+          calculator={clusterCalculator}
+        >
           {(clusterer) =>
             filtered.map((toilet) => (
               <Marker
@@ -230,10 +258,11 @@ function MapView() {
                 clusterer={clusterer}
                 position={{ lat: toilet.lat, lng: toilet.lng }}
                 onClick={() => setSelected(toilet)}
+                options={{ optimized: false }}
                 icon={{
-                  url: createMarkerIcon(getMarkerColor(toilet.average_rating)),
-                  scaledSize: new window.google.maps.Size(42, 42),
-                  anchor: new window.google.maps.Point(21, 21),
+                  url: createToiletMarkerIconUrl(getMarkerColor(toilet.average_rating)),
+                  scaledSize: new window.google.maps.Size(40, 40),
+                  anchor: new window.google.maps.Point(20, 20),
                 }}
               />
             ))
