@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { BADGES, getLevelFromPoints, getProgressToNextLevel, normaliseBadges } from '../utils/points'
 import { USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
@@ -25,6 +25,10 @@ function Profile() {
   const [reviewCount, setReviewCount] = useState(0)
   const [toiletCount, setToiletCount] = useState(0)
   const [recentReviews, setRecentReviews] = useState([])
+  const [savedToilets, setSavedToilets] = useState([])
+  const [conditionProfile, setConditionProfile] = useState('No specific condition')
+  const [radarKey, setRadarKey] = useState(false)
+  const [savingPrefs, setSavingPrefs] = useState(false)
 
   const loadProfile = useCallback(async (uid) => {
     if (!uid) return
@@ -32,7 +36,9 @@ function Profile() {
     const [pointsRes, reviewsRes, toiletsRes] = await Promise.all([
       supabase
         .from('user_points')
-        .select('points, level, badges, review_count, toilet_count')
+        .select(
+          'points, level, badges, review_count, toilet_count, is_pro, saved_toilets, condition_profile, radar_key',
+        )
         .eq('user_id', uid)
         .maybeSingle(),
       supabase
@@ -49,6 +55,8 @@ function Profile() {
 
     const pointsData = pointsRes.data || null
     setPointsRow(pointsData)
+    setConditionProfile(pointsData?.condition_profile || 'No specific condition')
+    setRadarKey(Boolean(pointsData?.radar_key))
 
     const reviewFallbackCount = toiletsRes[0].count ?? 0
     const toiletFallbackCount = toiletsRes[1].count ?? 0
@@ -63,6 +71,34 @@ function Profile() {
       toiletNames = Object.fromEntries((toilets || []).map((t) => [t.id, t.name]))
     }
     setRecentReviews(rows.map((r) => ({ ...r, toiletName: toiletNames[r.toilet_id] || 'Unknown WC' })))
+
+    const savedIds = Array.isArray(pointsData?.saved_toilets) ? pointsData.saved_toilets.filter(Boolean) : []
+    if (!savedIds.length) {
+      setSavedToilets([])
+      return
+    }
+    const [{ data: savedRows }, { data: savedReviews }] = await Promise.all([
+      supabase.from('toilets').select('id, name, lat, lng').in('id', savedIds),
+      supabase.from('reviews').select('toilet_id, overall_rating, rating').in('toilet_id', savedIds),
+    ])
+    const avgByToilet = {}
+    for (const review of savedReviews || []) {
+      const score = Number(review.overall_rating ?? review.rating)
+      if (!review.toilet_id || !score) continue
+      const existing = avgByToilet[review.toilet_id] || { total: 0, count: 0 }
+      existing.total += score
+      existing.count += 1
+      avgByToilet[review.toilet_id] = existing
+    }
+    setSavedToilets(
+      (savedRows || []).map((row) => {
+        const rating = avgByToilet[row.id]
+        return {
+          ...row,
+          average_rating: rating ? rating.total / rating.count : null,
+        }
+      }),
+    )
   }, [])
 
   useEffect(() => {
@@ -108,6 +144,7 @@ function Profile() {
   }, [loadProfile])
 
   const points = Number(pointsRow?.points) || 0
+  const isPro = Boolean(pointsRow?.is_pro)
   const resolvedLevel = useMemo(() => {
     if (pointsRow?.level) {
       const fromPoints = getLevelFromPoints(points)
@@ -134,6 +171,29 @@ function Profile() {
     navigate('/')
   }
 
+  const persistPreferences = async (nextPatch) => {
+    if (!user?.id) return
+    setSavingPrefs(true)
+    const { data: current } = await supabase
+      .from('user_points')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (current) {
+      await supabase.from('user_points').update(nextPatch).eq('user_id', user.id)
+    } else {
+      await supabase.from('user_points').insert({
+        user_id: user.id,
+        points: 0,
+        level: 'desperate_dan',
+        badges: [],
+        ...nextPatch,
+      })
+    }
+    setSavingPrefs(false)
+    loadProfile(user.id)
+  }
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -147,6 +207,13 @@ function Profile() {
   return (
     <div className={styles.page}>
       <BackButton />
+      {!isPro ? (
+        <Link to="/upgrade" className={styles.proBanner}>
+          Upgrade to Pro 🚽
+        </Link>
+      ) : (
+        <p className={styles.proBadge}>NearestWC Pro 👑</p>
+      )}
       <section className={styles.hero}>
         <p className={styles.heroSub}>Your Throne Report 🚽</p>
         <h1 className={styles.heroLevel}>
@@ -161,6 +228,10 @@ function Profile() {
             : 'Max level reached. You are now toilet royalty.'}
         </p>
       </section>
+
+      <Link to="/safe-route" className={styles.safeRouteLink}>
+        Plan a safe route 🗺️
+      </Link>
 
       <h2 className={styles.sectionTitle}>Your Contribution to Humanity 🌍</h2>
       <div className={styles.statsGrid}>
@@ -218,6 +289,73 @@ function Profile() {
           })}
         </ul>
       )}
+
+      <h2 className={styles.sectionTitle}>Saved WCs</h2>
+      {savedToilets.length === 0 ? (
+        <p className={styles.muted}>No saved WCs yet. Tap "Save this WC ⭐" in a listing to build your shortlist.</p>
+      ) : (
+        <ul className={styles.feed}>
+          {savedToilets.map((toilet) => (
+            <li key={toilet.id} className={styles.feedCard}>
+              <p className={styles.feedBody}>{toilet.name || 'Unnamed WC'}</p>
+              <p className={styles.feedMeta}>
+                {toilet.average_rating != null ? `${toilet.average_rating.toFixed(1)}/5` : 'No rating yet'}
+              </p>
+              <button
+                type="button"
+                className={styles.routeBtn}
+                onClick={() =>
+                  window.open(
+                    `https://www.google.com/maps/dir/?api=1&destination=${toilet.lat},${toilet.lng}`,
+                    '_blank',
+                    'noopener,noreferrer',
+                  )
+                }
+              >
+                Directions
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2 className={styles.sectionTitle}>Condition Profile</h2>
+      <div className={styles.prefCard}>
+        <label className={styles.prefLabel} htmlFor="condition-profile">
+          I have...
+        </label>
+        <select
+          id="condition-profile"
+          className={styles.select}
+          value={conditionProfile}
+          onChange={(e) => {
+            const value = e.target.value
+            setConditionProfile(value)
+            persistPreferences({ condition_profile: value })
+          }}
+        >
+          <option>No specific condition</option>
+          <option>Crohn&apos;s disease</option>
+          <option>Ulcerative Colitis</option>
+          <option>IBS</option>
+          <option>Other bowel condition</option>
+          <option>Mobility issues</option>
+          <option>Other</option>
+        </select>
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            checked={radarKey}
+            onChange={(e) => {
+              const checked = e.target.checked
+              setRadarKey(checked)
+              persistPreferences({ radar_key: checked })
+            }}
+          />
+          <span>I use a RADAR key</span>
+        </label>
+        {savingPrefs && <p className={styles.muted}>Saving profile preferences…</p>}
+      </div>
 
       <button type="button" className={styles.logoutBtnBottom} onClick={handleLogout} disabled={loggingOut}>
         {loggingOut ? 'Logging out…' : 'Log out'}

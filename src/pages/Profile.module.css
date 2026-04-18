@@ -16,6 +16,43 @@
   box-shadow: var(--shadow-sm);
 }
 
+.proBanner {
+  display: block;
+  margin-bottom: 12px;
+  text-decoration: none;
+  text-align: center;
+  background: #fff8e1;
+  border: 1px solid rgba(249, 171, 0, 0.45);
+  color: #8a6200;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.proBadge {
+  margin: 0 0 12px;
+  background: rgba(26, 115, 232, 0.1);
+  border: 1px solid rgba(26, 115, 232, 0.25);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  padding: 8px 12px;
+  display: inline-block;
+  font-weight: 700;
+}
+
+.safeRouteLink {
+  display: inline-block;
+  margin-bottom: 12px;
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--color-text-secondary);
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .heroLevel {
   font-size: 26px;
   font-weight: 700;
@@ -198,6 +235,52 @@
   font-size: 14px;
   color: var(--color-text);
   line-height: 1.45;
+}
+
+.routeBtn {
+  margin-top: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--color-text-secondary);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prefCard {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  padding: 12px;
+}
+
+.prefLabel {
+  display: block;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 14px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text);
 }
 
 .loading {

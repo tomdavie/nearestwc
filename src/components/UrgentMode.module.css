@@ -1,0 +1,35 @@
+.button {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(88px, env(safe-area-inset-bottom) + 80px);
+  z-index: 11;
+  border: none;
+  border-radius: var(--radius-full);
+  background: #d93025;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 18px;
+  box-shadow: 0 8px 18px rgba(217, 48, 37, 0.4);
+  white-space: nowrap;
+}
+
+.button:disabled {
+  opacity: 0.7;
+}
+
+.overlay {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: max(150px, env(safe-area-inset-bottom) + 132px);
+  z-index: 11;
+  background: #fff;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--color-text);
+}

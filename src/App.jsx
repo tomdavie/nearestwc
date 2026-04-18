@@ -5,6 +5,9 @@ import Login from './pages/Login'
 import Profile from './pages/Profile'
 import ToiletPage from './pages/ToiletPage'
 import Admin from './pages/Admin'
+import Upgrade from './pages/Upgrade'
+import ProSuccess from './pages/ProSuccess'
+import SafeRoute from './pages/SafeRoute'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import Terms from './pages/Terms'
 import NotFound from './pages/NotFound'
@@ -28,6 +31,9 @@ function AppShell() {
           <Route path="/add" element={<AddToilet />} />
           <Route path="/login" element={<Login />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/upgrade" element={<Upgrade />} />
+          <Route path="/pro-success" element={<ProSuccess />} />
+          <Route path="/safe-route" element={<SafeRoute />} />
           <Route path="/wc/:id" element={<ToiletPage />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />

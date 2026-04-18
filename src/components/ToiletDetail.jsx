@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
-import { fetchUserPoints, incrementUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
+import {
+  fetchUserPoints,
+  incrementUserPoints,
+  notifyUserPointsChanged,
+  USER_POINTS_CHANGED_EVENT,
+} from '../lib/userPoints'
 import { uploadReviewPhoto } from '../lib/storageUploads'
 import { getLevelFromPoints } from '../utils/points'
 import styles from './ToiletDetail.module.css'
@@ -71,6 +76,12 @@ function formatDayHours(day, hours) {
   return `${day}: ${hours.open} - ${hours.close}`
 }
 
+function hasBowelCondition(conditionProfile) {
+  return ['Crohn\'s disease', 'Ulcerative Colitis', 'IBS', 'Other bowel condition'].includes(
+    conditionProfile || '',
+  )
+}
+
 function ToiletDetail({ toilet, onClose, user }) {
   const { showToast } = useToast()
   const [reviews, setReviews] = useState([])
@@ -98,6 +109,8 @@ function ToiletDetail({ toilet, onClose, user }) {
   const [modalPhoto, setModalPhoto] = useState('')
   const [savingToilet, setSavingToilet] = useState(false)
   const [savedThisToilet, setSavedThisToilet] = useState(false)
+  const [userMeta, setUserMeta] = useState(null)
+  const [savingFavorite, setSavingFavorite] = useState(false)
   const dragStartY = useRef(null)
 
   useEffect(() => {
@@ -168,6 +181,12 @@ function ToiletDetail({ toilet, onClose, user }) {
     setLoadingPoints(true)
     const p = await fetchUserPoints(user.id)
     setUserPoints(p)
+    const { data: row } = await supabase
+      .from('user_points')
+      .select('is_pro, condition_profile, saved_toilets')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    setUserMeta(row || { is_pro: false, condition_profile: 'No specific condition', saved_toilets: [] })
     setLoadingPoints(false)
   }, [user?.id])
 
@@ -225,6 +244,10 @@ function ToiletDetail({ toilet, onClose, user }) {
       .map((day) => formatDayHours(day, openingHours.days[day]))
       .filter(Boolean)
   }, [openingHours])
+  const savedToiletIds = Array.isArray(userMeta?.saved_toilets) ? userMeta.saved_toilets : []
+  const isFavorite = Boolean(toilet?.id && savedToiletIds.includes(toilet.id))
+  const shouldShowKeyWarning =
+    Boolean(userMeta?.is_pro) && hasBowelCondition(userMeta?.condition_profile) && Boolean(toilet?.requires_key)
 
   const resetReviewForm = () => {
     setCleanlinessRating(5)
@@ -375,6 +398,47 @@ function ToiletDetail({ toilet, onClose, user }) {
     showToast('Saved! Community points delivered. 🙌', 'success')
   }
 
+  const toggleSavedToilet = async () => {
+    if (!user?.id || !toilet?.id) {
+      showToast('Login to save this WC.', 'info')
+      return
+    }
+    setSavingFavorite(true)
+    const current = Array.isArray(userMeta?.saved_toilets) ? userMeta.saved_toilets : []
+    const next = current.includes(toilet.id)
+      ? current.filter((id) => id !== toilet.id)
+      : [...new Set([...current, toilet.id])]
+    const { data: existing } = await supabase
+      .from('user_points')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (existing) {
+      const { error } = await supabase.from('user_points').update({ saved_toilets: next }).eq('user_id', user.id)
+      if (error) {
+        setSavingFavorite(false)
+        showToast(error.message, 'error')
+        return
+      }
+    } else {
+      const { error } = await supabase.from('user_points').insert({
+        user_id: user.id,
+        points: 0,
+        level: 'desperate_dan',
+        badges: [],
+        saved_toilets: next,
+      })
+      if (error) {
+        setSavingFavorite(false)
+        showToast(error.message, 'error')
+        return
+      }
+    }
+    setUserMeta((prev) => ({ ...(prev || {}), saved_toilets: next }))
+    notifyUserPointsChanged()
+    setSavingFavorite(false)
+  }
+
   const openDirections = () => {
     if (toilet?.lat == null || toilet?.lng == null) return
     const url = `https://www.google.com/maps/dir/?api=1&destination=${toilet.lat},${toilet.lng}`
@@ -509,6 +573,17 @@ function ToiletDetail({ toilet, onClose, user }) {
             {savedThisToilet ? 'Saved! 🙌 Thanks' : savingToilet ? 'Saving…' : '🙌 This saved me'}
           </button>
           {savedThisToilet && <p className={styles.savedNote}>+2 points awarded to the person who added this WC</p>}
+          <button
+            type="button"
+            className={styles.favouriteBtn}
+            onClick={toggleSavedToilet}
+            disabled={savingFavorite}
+          >
+            {savingFavorite ? 'Saving…' : isFavorite ? 'Saved ⭐' : 'Save this WC ⭐'}
+          </button>
+          {shouldShowKeyWarning && (
+            <p className={styles.keyWarning}>⚠️ This WC requires a key - may not be ideal in an emergency</p>
+          )}
 
           {tags.length > 0 && (
             <div className={styles.tags}>
@@ -533,6 +608,7 @@ function ToiletDetail({ toilet, onClose, user }) {
                 {toilet.accepts_card && <span className={styles.pill}>Card</span>}
               </>
             )}
+            {toilet.radar_key_accepted && <span className={styles.pill}>🔑 RADAR key accepted</span>}
           </div>
 
           {openingHours?.mode === '24_7' ? (

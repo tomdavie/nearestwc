@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { GoogleMap, useJsApiLoader, Marker, MarkerClustererF } from '@react-google-maps/api'
 import { supabase } from '../supabaseClient'
 import ToiletDetail from '../components/ToiletDetail'
+import UrgentMode from '../components/UrgentMode'
 import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
@@ -249,6 +250,8 @@ function MapView() {
           onClose={() => setSelected(null)}
         />
       )}
+
+      <UrgentMode toilets={toilets} user={user} />
 
       <button type="button" className={styles.locateBtn} onClick={locateMe} title="Locate me">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden>

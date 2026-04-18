@@ -283,6 +283,30 @@
   color: var(--color-text-muted);
 }
 
+.favouriteBtn {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #fff;
+  color: var(--color-text-secondary);
+  margin-left: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.keyWarning {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(217, 48, 37, 0.08);
+  border: 1px solid rgba(217, 48, 37, 0.2);
+  color: #a50e0e;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .reportArea {
   margin-top: 16px;
   border-top: 1px solid var(--color-border-light);
