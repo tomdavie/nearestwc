@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
+import { fetchUserPoints, incrementUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
 import styles from './ToiletDetail.module.css'
 
 function StarIcon({ filled }) {
@@ -45,14 +46,25 @@ function StarRow({ value, max = 5, size = 'md' }) {
   )
 }
 
+function reviewOverallScore(r) {
+  const v = r.overall_rating ?? r.rating
+  return Number(v) || 0
+}
+
 function ToiletDetail({ toilet, onClose, user }) {
   const { showToast } = useToast()
   const [reviews, setReviews] = useState([])
   const [loadingReviews, setLoadingReviews] = useState(true)
   const [exiting, setExiting] = useState(false)
-  const [newRating, setNewRating] = useState(5)
+  const [userPoints, setUserPoints] = useState(null)
+  const [loadingPoints, setLoadingPoints] = useState(false)
+  const [cleanlinessRating, setCleanlinessRating] = useState(5)
+  const [overallRating, setOverallRating] = useState(5)
+  const [hasToiletRoll, setHasToiletRoll] = useState(true)
+  const [hasSoap, setHasSoap] = useState(true)
   const [newComment, setNewComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [successBanner, setSuccessBanner] = useState(false)
   const dragStartY = useRef(null)
 
   const requestClose = useCallback(() => {
@@ -77,7 +89,9 @@ function ToiletDetail({ toilet, onClose, user }) {
     setLoadingReviews(true)
     const { data, error } = await supabase
       .from('reviews')
-      .select('id, rating, comment, created_at')
+      .select(
+        'id, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, comment, created_at',
+      )
       .eq('toilet_id', toilet.id)
       .order('created_at', { ascending: false })
 
@@ -90,9 +104,32 @@ function ToiletDetail({ toilet, onClose, user }) {
     setReviews(data || [])
   }, [toilet?.id, showToast])
 
+  const refreshPoints = useCallback(async () => {
+    if (!user?.id) {
+      setUserPoints(null)
+      return
+    }
+    setLoadingPoints(true)
+    const p = await fetchUserPoints(user.id)
+    setUserPoints(p)
+    setLoadingPoints(false)
+  }, [user?.id])
+
   useEffect(() => {
     loadReviews()
   }, [loadReviews])
+
+  useEffect(() => {
+    refreshPoints()
+  }, [refreshPoints])
+
+  useEffect(() => {
+    const onPoints = () => {
+      refreshPoints()
+    }
+    window.addEventListener(USER_POINTS_CHANGED_EVENT, onPoints)
+    return () => window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPoints)
+  }, [refreshPoints])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -104,7 +141,7 @@ function ToiletDetail({ toilet, onClose, user }) {
 
   const averageRating = useMemo(() => {
     if (!reviews.length) return null
-    const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0)
+    const sum = reviews.reduce((acc, r) => acc + reviewOverallScore(r), 0)
     return Math.round((sum / reviews.length) * 10) / 10
   }, [reviews])
 
@@ -119,27 +156,44 @@ function ToiletDetail({ toilet, onClose, user }) {
     return out
   }, [toilet])
 
+  const resetReviewForm = () => {
+    setCleanlinessRating(5)
+    setOverallRating(5)
+    setHasToiletRoll(true)
+    setHasSoap(true)
+    setNewComment('')
+  }
+
   const handleSubmitReview = async (e) => {
     e.preventDefault()
     if (!user || !toilet?.id) return
     setSubmitting(true)
-    const { error } = await supabase.from('reviews').insert([
-      {
-        toilet_id: toilet.id,
-        rating: newRating,
-        comment: newComment.trim() || null,
-        user_id: user.id,
-      },
-    ])
+    const payload = {
+      toilet_id: toilet.id,
+      user_id: user.id,
+      cleanliness: cleanlinessRating,
+      has_toilet_roll: hasToiletRoll,
+      has_soap: hasSoap,
+      overall_rating: overallRating,
+      comment: newComment.trim() || null,
+      rating: overallRating,
+    }
+    const { error } = await supabase.from('reviews').insert([payload])
     setSubmitting(false)
     if (error) {
       showToast(error.message, 'error')
       return
     }
-    showToast('Review posted.', 'success')
-    setNewComment('')
-    setNewRating(5)
+    try {
+      await incrementUserPoints(user.id, 10)
+    } catch (err) {
+      showToast(err?.message || 'Review saved, but points could not be updated.', 'error')
+    }
+    resetReviewForm()
     await loadReviews()
+    await refreshPoints()
+    setSuccessBanner(true)
+    window.setTimeout(() => setSuccessBanner(false), 3000)
   }
 
   const onHandleTouchStart = (e) => {
@@ -158,6 +212,14 @@ function ToiletDetail({ toilet, onClose, user }) {
   return (
     <>
       <div className={styles.backdrop} onClick={requestClose} aria-hidden />
+
+      {successBanner && (
+        <div className={styles.successOverlay} role="status" aria-live="polite">
+          <div className={styles.successCard}>
+            {`Nature thanks you. So do we. 🚽 You've earned 10 points for helping fellow humans in need.`}
+          </div>
+        </div>
+      )}
 
       <div
         className={`${styles.sheet} ${exiting ? styles.sheetExit : ''}`}
@@ -188,6 +250,12 @@ function ToiletDetail({ toilet, onClose, user }) {
         </div>
 
         <div className={styles.body}>
+          {user && (
+            <p className={styles.pointsTally}>
+              🏅 You have {loadingPoints ? '…' : userPoints ?? 0} points
+            </p>
+          )}
+
           <h2 id="toilet-detail-title" className={styles.title}>
             {toilet.name || 'Unnamed toilet'}
           </h2>
@@ -207,33 +275,50 @@ function ToiletDetail({ toilet, onClose, user }) {
               <>
                 <StarRow value={Math.round(averageRating)} />
                 <span className={styles.avgLabel}>
-                  {averageRating.toFixed(1)} average
+                  {averageRating.toFixed(1)} average overall
                   {!loadingReviews && reviews.length > 0 && ` · ${reviews.length} review${reviews.length === 1 ? '' : 's'}`}
                 </span>
               </>
             ) : (
               <span className={styles.avgLabel}>
-                {loadingReviews ? 'Loading reviews…' : 'No reviews yet'}
+                {loadingReviews ? 'Loading reviews…' : 'No reviews yet — brave the unknown?'}
               </span>
             )}
           </div>
 
           <p className={styles.sectionLabel}>Reviews</p>
           {!loadingReviews && reviews.length === 0 && (
-            <p className={styles.emptyReviews}>Be the first to share how it was.</p>
+            <p className={styles.emptyReviews}>
+              Radio silence. Be the first to report back from the front line.
+            </p>
           )}
           {reviews.length > 0 && (
             <ul className={styles.reviewList}>
               {reviews.map((r) => (
                 <li key={r.id} className={styles.reviewCard}>
                   <div className={styles.reviewMeta}>
-                    <StarRow value={Number(r.rating) || 0} size="sm" />
+                    <StarRow value={reviewOverallScore(r)} size="sm" />
+                    {r.cleanliness != null && (
+                      <span className={styles.reviewSub}>
+                        Cleanliness {Number(r.cleanliness)}/5
+                      </span>
+                    )}
                   </div>
+                  {(r.has_toilet_roll != null || r.has_soap != null) && (
+                    <p className={styles.reviewFacilities}>
+                      {r.has_toilet_roll != null && (
+                        <span className={styles.facilityChip}>Roll: {r.has_toilet_roll ? 'Yes' : 'No'}</span>
+                      )}
+                      {r.has_soap != null && (
+                        <span className={styles.facilityChip}>Soap: {r.has_soap ? 'Yes' : 'No'}</span>
+                      )}
+                    </p>
+                  )}
                   {r.comment ? (
                     <p className={styles.reviewComment}>{r.comment}</p>
                   ) : (
                     <p className={styles.reviewComment} style={{ color: 'var(--color-text-muted)' }}>
-                      No written comment.
+                      No extra notes — sometimes brevity is a mercy.
                     </p>
                   )}
                 </li>
@@ -244,32 +329,100 @@ function ToiletDetail({ toilet, onClose, user }) {
           {user ? (
             <form className={styles.form} onSubmit={handleSubmitReview}>
               <div>
-                <p className={styles.fieldLabel} id="new-rating-label">
-                  Your rating
+                <p className={styles.fieldLabel} id="cleanliness-label">
+                  Cleanliness
                 </p>
-                <div className={styles.starPicker} role="group" aria-labelledby="new-rating-label">
+                <div className={styles.starPicker} role="group" aria-labelledby="cleanliness-label">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button
                       key={n}
                       type="button"
-                      className={`${styles.starBtn} ${n <= newRating ? styles.starBtnActive : ''}`}
-                      onClick={() => setNewRating(n)}
-                      aria-label={`${n} stars`}
-                      aria-pressed={n <= newRating}
+                      className={`${styles.starBtn} ${n <= cleanlinessRating ? styles.starBtnActive : ''}`}
+                      onClick={() => setCleanlinessRating(n)}
+                      aria-label={`Cleanliness ${n} of 5`}
+                      aria-pressed={n <= cleanlinessRating}
                     >
-                      <StarIcon filled={n <= newRating} />
+                      <StarIcon filled={n <= cleanlinessRating} />
                     </button>
                   ))}
                 </div>
               </div>
               <div>
+                <p className={styles.fieldLabel} id="overall-label">
+                  Overall rating
+                </p>
+                <div className={styles.starPicker} role="group" aria-labelledby="overall-label">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`${styles.starBtn} ${n <= overallRating ? styles.starBtnActive : ''}`}
+                      onClick={() => setOverallRating(n)}
+                      aria-label={`Overall ${n} of 5`}
+                      aria-pressed={n <= overallRating}
+                    >
+                      <StarIcon filled={n <= overallRating} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className={styles.fieldLabel} id="roll-label">
+                  Toilet roll available
+                </p>
+                <div className={styles.seg} role="group" aria-labelledby="roll-label">
+                  <button
+                    type="button"
+                    className={`${styles.segBtn} ${hasToiletRoll ? styles.segBtnActive : ''}`}
+                    onClick={() => setHasToiletRoll(true)}
+                    aria-pressed={hasToiletRoll}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.segBtn} ${!hasToiletRoll ? styles.segBtnActive : ''}`}
+                    onClick={() => setHasToiletRoll(false)}
+                    aria-pressed={!hasToiletRoll}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className={styles.fieldLabel} id="soap-label">
+                  Soap available
+                </p>
+                <div className={styles.seg} role="group" aria-labelledby="soap-label">
+                  <button
+                    type="button"
+                    className={`${styles.segBtn} ${hasSoap ? styles.segBtnActive : ''}`}
+                    onClick={() => setHasSoap(true)}
+                    aria-pressed={hasSoap}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.segBtn} ${!hasSoap ? styles.segBtnActive : ''}`}
+                    onClick={() => setHasSoap(false)}
+                    aria-pressed={!hasSoap}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <label className={styles.fieldLabel} htmlFor="review-comment">
-                  Comment
+                  Anything else?
                 </label>
                 <textarea
                   id="review-comment"
                   className={styles.textarea}
-                  placeholder="Access, cleanliness, wait time…"
+                  placeholder="Anything else worth knowing? Don't be shy."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   rows={4}
@@ -281,7 +434,7 @@ function ToiletDetail({ toilet, onClose, user }) {
             </form>
           ) : (
             <p className={styles.loginHint}>
-              <Link to="/login">Login</Link> to leave a review
+              <Link to="/login">Login</Link> to leave a review — your fellow humans will thank you.
             </p>
           )}
         </div>

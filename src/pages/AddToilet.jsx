@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
+import { incrementUserPoints } from '../lib/userPoints'
 import { useNavigate } from 'react-router-dom'
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
 import { useToast } from '../context/useToast'
@@ -9,6 +10,9 @@ const defaultCenter = { lat: 51.505, lng: -0.09 }
 
 function AddToilet() {
   const [name, setName] = useState('')
+  const [openingHours, setOpeningHours] = useState('')
+  const [accessCode, setAccessCode] = useState('')
+  const [description, setDescription] = useState('')
   const [position, setPosition] = useState(null)
   const [isFree, setIsFree] = useState(true)
   const [isAccessible, setIsAccessible] = useState(false)
@@ -17,6 +21,7 @@ function AddToilet() {
   const [babyChanging, setBabyChanging] = useState(false)
   const [user, setUser] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [celebrate, setCelebrate] = useState(false)
   const navigate = useNavigate()
   const { showToast } = useToast()
 
@@ -72,14 +77,22 @@ function AddToilet() {
         requires_key: requiresKey,
         gender_neutral: genderNeutral,
         baby_changing: babyChanging,
+        opening_hours: openingHours.trim() || null,
+        access_code: accessCode.trim() || null,
+        description: description.trim() || null,
       },
     ])
     setSubmitting(false)
     if (error) {
       showToast(error.message, 'error')
     } else {
-      showToast('Toilet added. Thanks for helping the community!', 'success')
-      setTimeout(() => navigate('/'), 1200)
+      try {
+        await incrementUserPoints(user.id, 20)
+      } catch (err) {
+        showToast(err?.message || 'Toilet saved, but points could not be updated.', 'error')
+      }
+      setCelebrate(true)
+      window.setTimeout(() => navigate('/'), 3000)
     }
   }
 
@@ -87,10 +100,18 @@ function AddToilet() {
 
   return (
     <div className={styles.page}>
+      {celebrate && (
+        <div className={styles.celebrateOverlay} role="status" aria-live="polite">
+          <div className={styles.celebrateCard}>
+            Boom. You just helped someone in need. 🎉 +20 points added to your account.
+          </div>
+        </div>
+      )}
+
       <div className={styles.titleBlock}>
         <h1 className={styles.title}>Add a toilet</h1>
         <p className={styles.subtitle}>
-          Drop the pin on the exact entrance so others can find it quickly.
+          Drop the pin on the exact entrance so others can find it quickly. Precision beats panic.
         </p>
       </div>
 
@@ -108,6 +129,44 @@ function AddToilet() {
             onChange={(e) => setName(e.target.value)}
             required
             autoComplete="off"
+          />
+        </div>
+
+        <div className={styles.card}>
+          <label className={styles.cardLabel} htmlFor="wc-hours">
+            Opening hours
+          </label>
+          <input
+            id="wc-hours"
+            className={styles.field}
+            type="text"
+            placeholder="e.g. Mon-Sun 8am-8pm or 24 hours"
+            value={openingHours}
+            onChange={(e) => setOpeningHours(e.target.value)}
+            autoComplete="off"
+          />
+          <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-code">
+            Access code
+          </label>
+          <input
+            id="wc-code"
+            className={styles.field}
+            type="text"
+            placeholder="e.g. 1234 - leave blank if none"
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value)}
+            autoComplete="off"
+          />
+          <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-desc">
+            Description
+          </label>
+          <textarea
+            id="wc-desc"
+            className={styles.textarea}
+            placeholder="Tell people what to expect. No pressure, but details help."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
           />
         </div>
 

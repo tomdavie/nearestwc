@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../supabaseClient'
+import { fetchUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
 import styles from './Navbar.module.css'
 
 function IconPlus() {
@@ -29,6 +32,53 @@ function IconUser() {
 }
 
 function Navbar() {
+  const [sessionUser, setSessionUser] = useState(null)
+  const [points, setPoints] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+
+    const loadPointsForUser = async (u) => {
+      if (!u) {
+        if (alive) setPoints(null)
+        return
+      }
+      const p = await fetchUserPoints(u.id)
+      if (alive) setPoints(p)
+    }
+
+    const sync = (u) => {
+      if (!alive) return
+      setSessionUser(u ?? null)
+      loadPointsForUser(u ?? null)
+    }
+
+    supabase.auth.getUser().then(({ data }) => sync(data.user))
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      sync(session?.user ?? null)
+    })
+
+    const onPointsChanged = () => {
+      supabase.auth.getUser().then(({ data }) => {
+        if (!alive) return
+        const u = data.user
+        if (u) loadPointsForUser(u)
+        else setPoints(null)
+      })
+    }
+
+    window.addEventListener(USER_POINTS_CHANGED_EVENT, onPointsChanged)
+
+    return () => {
+      alive = false
+      subscription.unsubscribe()
+      window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPointsChanged)
+    }
+  }, [])
+
   return (
     <header className={styles.nav}>
       <Link to="/" className={styles.brand}>
@@ -42,10 +92,17 @@ function Navbar() {
           <IconPlus />
           <span className={styles.srOnly}>Add WC</span>
         </Link>
-        <Link to="/login" className={styles.iconLink} title="Account">
-          <IconUser />
-          <span className={styles.srOnly}>Login</span>
-        </Link>
+        <div className={styles.accountCluster}>
+          {sessionUser && points != null && (
+            <span className={styles.pointsBadge} aria-label={`${points} points`}>
+              🏅 {points}pts
+            </span>
+          )}
+          <Link to="/login" className={styles.iconLink} title="Account">
+            <IconUser />
+            <span className={styles.srOnly}>Login</span>
+          </Link>
+        </div>
       </div>
     </header>
   )

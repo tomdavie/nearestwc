@@ -197,6 +197,7 @@
 .reviewMeta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 6px;
 }
@@ -321,4 +322,122 @@
 .submit:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.pointsTally {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0 0 10px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.successOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.successCard {
+  max-width: 320px;
+  padding: 18px 20px;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--color-text);
+  text-align: center;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+  animation: celebratePop 3s ease forwards;
+}
+
+@keyframes celebratePop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .successCard {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.seg {
+  display: inline-flex;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.segBtn {
+  min-width: 72px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  background: #fff;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segBtn + .segBtn {
+  border-left: 1px solid var(--color-border);
+}
+
+.segBtnActive {
+  background: rgba(26, 115, 232, 0.1);
+  color: var(--color-primary);
+}
+
+.segBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.reviewSub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.reviewFacilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.facilityChip {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
+  font-weight: 600;
 }
