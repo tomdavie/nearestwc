@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
 import { fetchUserPoints, incrementUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
+import { getLevelFromPoints } from '../utils/points'
 import styles from './ToiletDetail.module.css'
 
 function StarIcon({ filled }) {
@@ -65,6 +66,9 @@ function ToiletDetail({ toilet, onClose, user }) {
   const [newComment, setNewComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [successBanner, setSuccessBanner] = useState(false)
+  const [badgeFanfare, setBadgeFanfare] = useState(null)
+  const [reviewerMeta, setReviewerMeta] = useState({})
+  const [helpfulLoadingId, setHelpfulLoadingId] = useState(null)
   const dragStartY = useRef(null)
 
   const requestClose = useCallback(() => {
@@ -90,18 +94,35 @@ function ToiletDetail({ toilet, onClose, user }) {
     const { data, error } = await supabase
       .from('reviews')
       .select(
-        'id, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, comment, created_at',
+        'id, user_id, helpful_count, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, comment, created_at',
       )
       .eq('toilet_id', toilet.id)
       .order('created_at', { ascending: false })
 
-    setLoadingReviews(false)
     if (error) {
+      setLoadingReviews(false)
       showToast(error.message, 'error')
       setReviews([])
+      setReviewerMeta({})
       return
     }
-    setReviews(data || [])
+
+    const list = data || []
+    const authorIds = [...new Set(list.map((r) => r.user_id).filter(Boolean))]
+    let meta = {}
+    if (authorIds.length) {
+      const { data: upRows } = await supabase
+        .from('user_points')
+        .select('user_id, points')
+        .in('user_id', authorIds)
+      for (const row of upRows || []) {
+        const L = getLevelFromPoints(row.points)
+        meta[row.user_id] = { emoji: L.emoji, title: L.name }
+      }
+    }
+    setReviewerMeta(meta)
+    setReviews(list)
+    setLoadingReviews(false)
   }, [toilet?.id, showToast])
 
   const refreshPoints = useCallback(async () => {
@@ -184,16 +205,55 @@ function ToiletDetail({ toilet, onClose, user }) {
       showToast(error.message, 'error')
       return
     }
+    let gamification = { newBadges: [] }
     try {
-      await incrementUserPoints(user.id, 10)
+      gamification = await incrementUserPoints(user.id, 10)
     } catch (err) {
       showToast(err?.message || 'Review saved, but points could not be updated.', 'error')
+    }
+    if (gamification?.newBadges?.length) {
+      const b = gamification.newBadges[0]
+      let msg = `🎉 Badge Unlocked: ${b.name}! ${b.description} Humanity salutes you.`
+      if (gamification.newBadges.length > 1) {
+        msg += `\n\n(+${gamification.newBadges.length - 1} more badge${gamification.newBadges.length > 2 ? 's' : ''} — legend behaviour.)`
+      }
+      setBadgeFanfare(msg)
+      window.setTimeout(() => setBadgeFanfare(null), 4200)
     }
     resetReviewForm()
     await loadReviews()
     await refreshPoints()
     setSuccessBanner(true)
     window.setTimeout(() => setSuccessBanner(false), 3000)
+  }
+
+  const markHelpful = async (reviewId, authorId) => {
+    if (!user || !authorId || authorId === user.id) return
+    setHelpfulLoadingId(reviewId)
+    const { data: rev, error: e1 } = await supabase
+      .from('reviews')
+      .select('helpful_count')
+      .eq('id', reviewId)
+      .maybeSingle()
+    if (e1 || !rev) {
+      showToast(e1?.message || 'Could not load review.', 'error')
+      setHelpfulLoadingId(null)
+      return
+    }
+    const next = (Number(rev.helpful_count) || 0) + 1
+    const { error: e2 } = await supabase.from('reviews').update({ helpful_count: next }).eq('id', reviewId)
+    if (e2) {
+      showToast(e2.message, 'error')
+      setHelpfulLoadingId(null)
+      return
+    }
+    try {
+      await incrementUserPoints(authorId, 5)
+    } catch (err) {
+      showToast(err?.message || 'Marked helpful, but bonus points failed.', 'error')
+    }
+    setReviews((prev) => prev.map((x) => (x.id === reviewId ? { ...x, helpful_count: next } : x)))
+    setHelpfulLoadingId(null)
   }
 
   const onHandleTouchStart = (e) => {
@@ -218,6 +278,12 @@ function ToiletDetail({ toilet, onClose, user }) {
           <div className={styles.successCard}>
             {`Nature thanks you. So do we. 🚽 You've earned 10 points for helping fellow humans in need.`}
           </div>
+        </div>
+      )}
+
+      {badgeFanfare && (
+        <div className={styles.badgeFanfareOverlay} role="status" aria-live="polite">
+          <div className={styles.badgeFanfareCard}>{badgeFanfare}</div>
         </div>
       )}
 
@@ -296,13 +362,32 @@ function ToiletDetail({ toilet, onClose, user }) {
             <ul className={styles.reviewList}>
               {reviews.map((r) => (
                 <li key={r.id} className={styles.reviewCard}>
+                  {r.user_id && reviewerMeta[r.user_id] ? (
+                    <p className={styles.reviewerSays}>
+                      <span className={styles.reviewerTag}>
+                        {reviewerMeta[r.user_id].emoji} {reviewerMeta[r.user_id].title} says:
+                      </span>
+                      {r.cleanliness != null
+                        ? ` cleanliness ${Number(r.cleanliness)}/5`
+                        : ` overall ${reviewOverallScore(r)}/5`}
+                    </p>
+                  ) : r.user_id ? (
+                    <p className={styles.reviewerSays}>
+                      <span className={styles.reviewerTag}>Fellow traveller says:</span>
+                      {r.cleanliness != null
+                        ? ` cleanliness ${Number(r.cleanliness)}/5`
+                        : ` overall ${reviewOverallScore(r)}/5`}
+                    </p>
+                  ) : (
+                    <p className={styles.reviewerSays}>
+                      <span className={styles.reviewerTag}>Anonymous scout says:</span>
+                      {r.cleanliness != null
+                        ? ` cleanliness ${Number(r.cleanliness)}/5`
+                        : ` overall ${reviewOverallScore(r)}/5`}
+                    </p>
+                  )}
                   <div className={styles.reviewMeta}>
                     <StarRow value={reviewOverallScore(r)} size="sm" />
-                    {r.cleanliness != null && (
-                      <span className={styles.reviewSub}>
-                        Cleanliness {Number(r.cleanliness)}/5
-                      </span>
-                    )}
                   </div>
                   {(r.has_toilet_roll != null || r.has_soap != null) && (
                     <p className={styles.reviewFacilities}>
@@ -320,6 +405,18 @@ function ToiletDetail({ toilet, onClose, user }) {
                     <p className={styles.reviewComment} style={{ color: 'var(--color-text-muted)' }}>
                       No extra notes — sometimes brevity is a mercy.
                     </p>
+                  )}
+                  {user && r.user_id && r.user_id !== user.id && (
+                    <button
+                      type="button"
+                      className={styles.helpfulBtn}
+                      disabled={helpfulLoadingId === r.id}
+                      onClick={() => markHelpful(r.id, r.user_id)}
+                    >
+                      {helpfulLoadingId === r.id
+                        ? 'Saving…'
+                        : `Helpful · ${Number(r.helpful_count) || 0}`}
+                    </button>
                   )}
                 </li>
               ))}

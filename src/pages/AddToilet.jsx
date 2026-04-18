@@ -22,6 +22,7 @@ function AddToilet() {
   const [user, setUser] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [celebrate, setCelebrate] = useState(false)
+  const [celebrateBadges, setCelebrateBadges] = useState([])
   const navigate = useNavigate()
   const { showToast } = useToast()
 
@@ -86,11 +87,13 @@ function AddToilet() {
     if (error) {
       showToast(error.message, 'error')
     } else {
+      let gamification = { newBadges: [] }
       try {
-        await incrementUserPoints(user.id, 20)
+        gamification = await incrementUserPoints(user.id, 20)
       } catch (err) {
         showToast(err?.message || 'Toilet saved, but points could not be updated.', 'error')
       }
+      setCelebrateBadges(gamification?.newBadges || [])
       setCelebrate(true)
       window.setTimeout(() => navigate('/'), 3000)
     }
@@ -104,6 +107,16 @@ function AddToilet() {
         <div className={styles.celebrateOverlay} role="status" aria-live="polite">
           <div className={styles.celebrateCard}>
             Boom. You just helped someone in need. 🎉 +20 points added to your account.
+            {celebrateBadges.length > 0 && (
+              <p className={styles.celebrateBadges}>
+                {celebrateBadges
+                  .map(
+                    (b) =>
+                      `🎉 Badge Unlocked: ${b.name}! ${b.description} Humanity salutes you.`,
+                  )
+                  .join('\n\n')}
+              </p>
+            )}
           </div>
         </div>
       )}

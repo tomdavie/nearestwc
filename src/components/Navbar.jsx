@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { fetchUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
+import { getLevelFromPoints } from '../utils/points'
 import styles from './Navbar.module.css'
 
 function IconPlus() {
@@ -79,6 +80,8 @@ function Navbar() {
     }
   }, [])
 
+  const levelEmoji = points != null ? getLevelFromPoints(points).emoji : ''
+
   return (
     <header className={styles.nav}>
       <Link to="/" className={styles.brand}>
@@ -94,9 +97,13 @@ function Navbar() {
         </Link>
         <div className={styles.accountCluster}>
           {sessionUser && points != null && (
-            <span className={styles.pointsBadge} aria-label={`${points} points`}>
-              🏅 {points}pts
-            </span>
+            <Link
+              to="/profile"
+              className={styles.pointsBadge}
+              aria-label={`Profile and points, ${points} points`}
+            >
+              {levelEmoji} {points}pts
+            </Link>
           )}
           <Link to="/login" className={styles.iconLink} title="Account">
             <IconUser />
