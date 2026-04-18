@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, Marker, MarkerClustererF } from '@react-google-maps/api'
 import { supabase } from '../supabaseClient'
 import ToiletDetail from '../components/ToiletDetail'
 import styles from './MapView.module.css'
@@ -40,9 +40,12 @@ function MapView() {
   const [selected, setSelected] = useState(null)
   const [user, setUser] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
-  const [query, setQuery] = useState('')
+  const [map, setMap] = useState(null)
+  const [searchText, setSearchText] = useState('')
   const [freeOnly, setFreeOnly] = useState(false)
   const [accessibleOnly, setAccessibleOnly] = useState(false)
+  const [openNowOnly, setOpenNowOnly] = useState(false)
+  const [searching, setSearching] = useState(false)
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
@@ -103,14 +106,70 @@ function MapView() {
   }, [])
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const now = new Date()
+    const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()]
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+    const isOpenNow = (toilet) => {
+      if (!openNowOnly) return true
+      if (!toilet.opening_hours) return false
+      let parsed = null
+      try {
+        parsed =
+          typeof toilet.opening_hours === 'string'
+            ? JSON.parse(toilet.opening_hours)
+            : toilet.opening_hours
+      } catch {
+        return false
+      }
+      if (!parsed) return false
+      if (parsed.mode === '24_7') return true
+      if (parsed.mode !== 'scheduled' || !parsed.days) return false
+      const daySlot = parsed.days[weekday]
+      if (!daySlot?.open || !daySlot?.close) return false
+      return currentTime >= daySlot.open && currentTime <= daySlot.close
+    }
+
     return toilets.filter((t) => {
-      if (q && !(t.name || '').toLowerCase().includes(q)) return false
       if (freeOnly && !t.is_free) return false
       if (accessibleOnly && !t.is_accessible) return false
+      if (!isOpenNow(t)) return false
       return true
     })
-  }, [toilets, query, freeOnly, accessibleOnly])
+  }, [toilets, freeOnly, accessibleOnly, openNowOnly])
+
+  const locateMe = () => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const point = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setUserLocation(point)
+        if (map) {
+          map.panTo(point)
+          map.setZoom(16)
+        }
+      },
+      () => {},
+    )
+  }
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    const q = searchText.trim()
+    if (!q || !window.google?.maps?.Geocoder) return
+    setSearching(true)
+    const geocoder = new window.google.maps.Geocoder()
+    geocoder.geocode({ address: q }, (results, status) => {
+      setSearching(false)
+      if (status !== 'OK' || !results?.[0]?.geometry?.location) return
+      const loc = results[0].geometry.location
+      const point = { lat: loc.lat(), lng: loc.lng() }
+      if (map) {
+        map.panTo(point)
+        map.setZoom(15)
+      }
+      setUserLocation(point)
+    })
+  }
 
   if (!isLoaded) {
     return (
@@ -127,6 +186,7 @@ function MapView() {
         mapContainerClassName={styles.map}
         center={userLocation || defaultCenter}
         zoom={15}
+        onLoad={(instance) => setMap(instance)}
         options={{
           fullscreenControl: false,
           mapTypeControl: false,
@@ -134,18 +194,23 @@ function MapView() {
           zoomControl: true,
         }}
       >
-        {filtered.map((toilet) => (
-          <Marker
-            key={toilet.id}
-            position={{ lat: toilet.lat, lng: toilet.lng }}
-            onClick={() => setSelected(toilet)}
-            icon={{
-              url: createMarkerIcon(getMarkerColor(toilet.average_rating)),
-              scaledSize: new window.google.maps.Size(42, 42),
-              anchor: new window.google.maps.Point(21, 21),
-            }}
-          />
-        ))}
+        <MarkerClustererF>
+          {(clusterer) =>
+            filtered.map((toilet) => (
+              <Marker
+                key={toilet.id}
+                clusterer={clusterer}
+                position={{ lat: toilet.lat, lng: toilet.lng }}
+                onClick={() => setSelected(toilet)}
+                icon={{
+                  url: createMarkerIcon(getMarkerColor(toilet.average_rating)),
+                  scaledSize: new window.google.maps.Size(42, 42),
+                  anchor: new window.google.maps.Point(21, 21),
+                }}
+              />
+            ))
+          }
+        </MarkerClustererF>
 
       </GoogleMap>
 
@@ -158,19 +223,26 @@ function MapView() {
         />
       )}
 
+      <button type="button" className={styles.locateBtn} onClick={locateMe} title="Locate me">
+        🎯
+      </button>
+
       <div className={styles.floatingBar}>
-        <div className={styles.searchCard}>
+        <form className={styles.searchCard} onSubmit={handleSearch}>
           <SearchIcon />
           <input
             className={styles.searchInput}
             type="search"
             enterKeyHint="search"
-            placeholder="Search by name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search toilets by name"
+            placeholder="Search an address or place"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            aria-label="Search an address or place"
           />
-        </div>
+          <button type="submit" className={styles.searchGo} disabled={searching}>
+            {searching ? '…' : 'Go'}
+          </button>
+        </form>
         <div className={styles.chips}>
           <button
             type="button"
@@ -185,6 +257,13 @@ function MapView() {
             onClick={() => setAccessibleOnly((v) => !v)}
           >
             Accessible
+          </button>
+          <button
+            type="button"
+            className={`${styles.chip} ${openNowOnly ? styles.chipActive : ''}`}
+            onClick={() => setOpenNowOnly((v) => !v)}
+          >
+            Open now
           </button>
         </div>
       </div>

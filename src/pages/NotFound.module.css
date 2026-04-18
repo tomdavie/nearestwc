@@ -1,0 +1,38 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--navbar-offset) + 24px) 16px max(24px, env(safe-area-inset-bottom));
+}
+
+.card {
+  max-width: 520px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  padding: 22px;
+  text-align: center;
+}
+
+.card h1 {
+  font-size: 36px;
+  margin: 0 0 10px;
+}
+
+.card p {
+  margin: 0 0 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.btn {
+  display: inline-block;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #fff;
+  text-decoration: none;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
 import { fetchUserPoints, incrementUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
+import { uploadReviewPhoto } from '../lib/storageUploads'
 import { getLevelFromPoints } from '../utils/points'
 import styles from './ToiletDetail.module.css'
 
@@ -52,6 +53,24 @@ function reviewOverallScore(r) {
   return Number(v) || 0
 }
 
+function parseOpeningHours(raw) {
+  if (!raw) return null
+  if (typeof raw === 'object') return raw
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function formatDayHours(day, hours) {
+  if (!hours?.open || !hours?.close) return null
+  return `${day}: ${hours.open} - ${hours.close}`
+}
+
 function ToiletDetail({ toilet, onClose, user }) {
   const { showToast } = useToast()
   const [reviews, setReviews] = useState([])
@@ -64,11 +83,20 @@ function ToiletDetail({ toilet, onClose, user }) {
   const [hasToiletRoll, setHasToiletRoll] = useState(true)
   const [hasSoap, setHasSoap] = useState(true)
   const [newComment, setNewComment] = useState('')
+  const [reviewPhoto, setReviewPhoto] = useState(null)
+  const [reviewPhotoPreview, setReviewPhotoPreview] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [successBanner, setSuccessBanner] = useState(false)
   const [badgeFanfare, setBadgeFanfare] = useState(null)
   const [reviewerMeta, setReviewerMeta] = useState({})
   const [helpfulLoadingId, setHelpfulLoadingId] = useState(null)
+  const [copiedCode, setCopiedCode] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportReason, setReportReason] = useState('Permanently closed')
+  const [reportDetails, setReportDetails] = useState('')
+  const [submittingReport, setSubmittingReport] = useState(false)
+  const [modalPhoto, setModalPhoto] = useState('')
+  const [savingToilet, setSavingToilet] = useState(false)
   const dragStartY = useRef(null)
 
   const requestClose = useCallback(() => {
@@ -94,7 +122,7 @@ function ToiletDetail({ toilet, onClose, user }) {
     const { data, error } = await supabase
       .from('reviews')
       .select(
-        'id, user_id, helpful_count, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, comment, created_at',
+        'id, user_id, helpful_count, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, comment, photo_url, created_at',
       )
       .eq('toilet_id', toilet.id)
       .order('created_at', { ascending: false })
@@ -137,6 +165,12 @@ function ToiletDetail({ toilet, onClose, user }) {
   }, [user?.id])
 
   useEffect(() => {
+    return () => {
+      if (reviewPhotoPreview) URL.revokeObjectURL(reviewPhotoPreview)
+    }
+  }, [reviewPhotoPreview])
+
+  useEffect(() => {
     loadReviews()
   }, [loadReviews])
 
@@ -169,13 +203,21 @@ function ToiletDetail({ toilet, onClose, user }) {
   const tags = useMemo(() => {
     if (!toilet) return []
     const out = []
-    if (toilet.is_free) out.push({ key: 'free', label: 'Free' })
     if (toilet.is_accessible) out.push({ key: 'accessible', label: 'Accessible' })
     if (toilet.requires_key) out.push({ key: 'key', label: 'Requires Key' })
     if (toilet.gender_neutral) out.push({ key: 'neutral', label: 'Gender Neutral' })
     if (toilet.baby_changing) out.push({ key: 'baby', label: 'Baby Changing' })
     return out
   }, [toilet])
+
+  const openingHours = useMemo(() => parseOpeningHours(toilet?.opening_hours), [toilet?.opening_hours])
+  const dayHoursLines = useMemo(() => {
+    if (!openingHours || openingHours.mode !== 'scheduled' || !openingHours.days) return []
+    const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    return order
+      .map((day) => formatDayHours(day, openingHours.days[day]))
+      .filter(Boolean)
+  }, [openingHours])
 
   const resetReviewForm = () => {
     setCleanlinessRating(5)
@@ -189,6 +231,14 @@ function ToiletDetail({ toilet, onClose, user }) {
     e.preventDefault()
     if (!user || !toilet?.id) return
     setSubmitting(true)
+    let photoUrl = null
+    if (reviewPhoto) {
+      try {
+        photoUrl = await uploadReviewPhoto(reviewPhoto, user.id)
+      } catch (err) {
+        showToast(err?.message || 'Could not upload review photo.', 'error')
+      }
+    }
     const payload = {
       toilet_id: toilet.id,
       user_id: user.id,
@@ -198,6 +248,7 @@ function ToiletDetail({ toilet, onClose, user }) {
       overall_rating: overallRating,
       comment: newComment.trim() || null,
       rating: overallRating,
+      photo_url: photoUrl,
     }
     const { error } = await supabase.from('reviews').insert([payload])
     setSubmitting(false)
@@ -221,6 +272,11 @@ function ToiletDetail({ toilet, onClose, user }) {
       window.setTimeout(() => setBadgeFanfare(null), 4200)
     }
     resetReviewForm()
+    setReviewPhoto(null)
+    if (reviewPhotoPreview) {
+      URL.revokeObjectURL(reviewPhotoPreview)
+      setReviewPhotoPreview('')
+    }
     await loadReviews()
     await refreshPoints()
     setSuccessBanner(true)
@@ -267,6 +323,93 @@ function ToiletDetail({ toilet, onClose, user }) {
     dragStartY.current = null
   }
 
+  const copyAccessCode = async () => {
+    const code = toilet?.access_code
+    if (!code) return
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedCode(true)
+      window.setTimeout(() => setCopiedCode(false), 2000)
+    } catch {
+      showToast('Could not copy code on this device.', 'error')
+    }
+  }
+
+  const onReviewPhotoChange = (e) => {
+    const file = e.target.files?.[0]
+    setReviewPhoto(file || null)
+    if (reviewPhotoPreview) URL.revokeObjectURL(reviewPhotoPreview)
+    setReviewPhotoPreview(file ? URL.createObjectURL(file) : '')
+  }
+
+  const markSavedMe = async () => {
+    if (!toilet?.id || !toilet?.added_by || !user) {
+      if (!user) showToast('Login to save this WC.', 'info')
+      return
+    }
+    setSavingToilet(true)
+    const next = (Number(toilet.saves_count) || 0) + 1
+    const { error } = await supabase.from('toilets').update({ saves_count: next }).eq('id', toilet.id)
+    setSavingToilet(false)
+    if (error) {
+      showToast(error.message, 'error')
+      return
+    }
+    toilet.saves_count = next
+    try {
+      await incrementUserPoints(toilet.added_by, 2)
+    } catch (err) {
+      showToast(err?.message || 'Saved, but points award failed.', 'error')
+    }
+    showToast('Saved! Community points delivered. 🙌', 'success')
+  }
+
+  const handleShare = async () => {
+    const shareUrl = `https://nearestwc.app/wc/${toilet.id}`
+    const payload = {
+      title: toilet.name || 'NearestWC listing',
+      text: `Check out this WC: ${toilet.name || 'NearestWC listing'}`,
+      url: shareUrl,
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share(payload)
+        return
+      }
+      await navigator.clipboard.writeText(shareUrl)
+      showToast('Link copied!', 'success')
+    } catch {
+      showToast('Could not share right now.', 'error')
+    }
+  }
+
+  const submitReport = async (e) => {
+    e.preventDefault()
+    if (!user) {
+      showToast('Login to report an issue.', 'info')
+      return
+    }
+    setSubmittingReport(true)
+    const { error } = await supabase.from('reports').insert([
+      {
+        toilet_id: toilet.id,
+        user_id: user.id,
+        reason: reportReason,
+        details: reportDetails.trim() || null,
+        created_at: new Date().toISOString(),
+      },
+    ])
+    setSubmittingReport(false)
+    if (error) {
+      showToast(error.message, 'error')
+      return
+    }
+    setReportOpen(false)
+    setReportDetails('')
+    setReportReason('Permanently closed')
+    showToast("Thanks for the heads up. We'll look into it. 🔍", 'success')
+  }
+
   if (!toilet) return null
 
   return (
@@ -285,6 +428,12 @@ function ToiletDetail({ toilet, onClose, user }) {
         <div className={styles.badgeFanfareOverlay} role="status" aria-live="polite">
           <div className={styles.badgeFanfareCard}>{badgeFanfare}</div>
         </div>
+      )}
+
+      {modalPhoto && (
+        <button type="button" className={styles.photoModal} onClick={() => setModalPhoto('')}>
+          <img src={modalPhoto} alt="Review full size" />
+        </button>
       )}
 
       <div
@@ -316,6 +465,9 @@ function ToiletDetail({ toilet, onClose, user }) {
         </div>
 
         <div className={styles.body}>
+          {toilet.photo_url && (
+            <img className={styles.bannerPhoto} src={toilet.photo_url} alt={`${toilet.name || 'Toilet'} exterior`} />
+          )}
           {user && (
             <p className={styles.pointsTally}>
               🏅 You have {loadingPoints ? '…' : userPoints ?? 0} points
@@ -325,6 +477,12 @@ function ToiletDetail({ toilet, onClose, user }) {
           <h2 id="toilet-detail-title" className={styles.title}>
             {toilet.name || 'Unnamed toilet'}
           </h2>
+          <button type="button" className={styles.shareBtn} onClick={handleShare}>
+            🔗 Share this WC
+          </button>
+          <button type="button" className={styles.savedBtn} onClick={markSavedMe} disabled={savingToilet}>
+            {savingToilet ? 'Saving…' : '🙌 This saved me'}
+          </button>
 
           {tags.length > 0 && (
             <div className={styles.tags}>
@@ -333,6 +491,49 @@ function ToiletDetail({ toilet, onClose, user }) {
                   {t.label}
                 </span>
               ))}
+            </div>
+          )}
+
+          <p className={styles.sectionLabel}>Access and hours</p>
+          <div className={styles.metaPills}>
+            {toilet.is_free ? (
+              <span className={`${styles.pill} ${styles.pillFree}`}>Free 🆓</span>
+            ) : (
+              <>
+                <span className={`${styles.pill} ${styles.pillPaid}`}>
+                  {toilet.cost ? `Paid ${toilet.cost}` : 'Paid'}
+                </span>
+                {toilet.accepts_cash && <span className={styles.pill}>Cash</span>}
+                {toilet.accepts_card && <span className={styles.pill}>Card</span>}
+              </>
+            )}
+          </div>
+
+          {openingHours?.mode === '24_7' ? (
+            <p className={styles.hoursLine}>
+              <span className={styles.pill}>24 hours 🕐</span>
+            </p>
+          ) : dayHoursLines.length > 0 ? (
+            <ul className={styles.hoursList}>
+              {dayHoursLines.map((line) => (
+                <li key={line} className={styles.hoursItem}>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.hoursUnknown}>Hours unknown</p>
+          )}
+
+          {toilet.access_code && (
+            <div className={styles.codeBox}>
+              <p className={styles.codeLabel}>Access code</p>
+              <div className={styles.codeRow}>
+                <code className={styles.codeValue}>{toilet.access_code}</code>
+                <button type="button" className={styles.codeCopyBtn} onClick={copyAccessCode}>
+                  {copiedCode ? 'Copied! ✓' : 'Copy code'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -405,6 +606,14 @@ function ToiletDetail({ toilet, onClose, user }) {
                     <p className={styles.reviewComment} style={{ color: 'var(--color-text-muted)' }}>
                       No extra notes — sometimes brevity is a mercy.
                     </p>
+                  )}
+                  {r.photo_url && (
+                    <img
+                      src={r.photo_url}
+                      alt="Review upload"
+                      className={styles.reviewThumb}
+                      onClick={() => setModalPhoto(r.photo_url)}
+                    />
                   )}
                   {user && r.user_id && r.user_id !== user.id && (
                     <button
@@ -524,6 +733,15 @@ function ToiletDetail({ toilet, onClose, user }) {
                   onChange={(e) => setNewComment(e.target.value)}
                   rows={4}
                 />
+                <input
+                  className={styles.fileInput}
+                  type="file"
+                  accept="image/*"
+                  onChange={onReviewPhotoChange}
+                />
+                {reviewPhotoPreview && (
+                  <img src={reviewPhotoPreview} alt="Review preview" className={styles.reviewThumbLarge} />
+                )}
               </div>
               <button className={styles.submit} type="submit" disabled={submitting}>
                 {submitting ? 'Posting…' : 'Post review'}
@@ -534,6 +752,37 @@ function ToiletDetail({ toilet, onClose, user }) {
               <Link to="/login">Login</Link> to leave a review — your fellow humans will thank you.
             </p>
           )}
+
+          <div className={styles.reportArea}>
+            <button type="button" className={styles.reportBtn} onClick={() => setReportOpen((v) => !v)}>
+              🚩 Report an issue
+            </button>
+            {reportOpen && (
+              <form className={styles.reportForm} onSubmit={submitReport}>
+                <select
+                  className={styles.reportSelect}
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                >
+                  <option>Permanently closed</option>
+                  <option>Wrong location</option>
+                  <option>Incorrect information</option>
+                  <option>Offensive content</option>
+                  <option>Other</option>
+                </select>
+                <textarea
+                  className={styles.textarea}
+                  rows={3}
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Any extra details?"
+                />
+                <button type="submit" className={styles.submit} disabled={submittingReport}>
+                  {submittingReport ? 'Sending…' : 'Send report'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </>

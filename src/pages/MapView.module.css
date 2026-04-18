@@ -63,6 +63,17 @@
   gap: 10px;
 }
 
+.searchGo {
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
 .searchIcon {
   flex-shrink: 0;
   color: var(--color-text-muted);
@@ -87,11 +98,14 @@
 
 .chips {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   gap: 8px;
+  padding-bottom: 2px;
 }
 
 .chip {
+  flex: 0 0 auto;
   border: 1px solid var(--color-border);
   background: #fff;
   color: var(--color-text-secondary);
@@ -135,4 +149,26 @@
 .fab:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 3px;
+}
+
+.locateBtn {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom) + 16px);
+  z-index: 10;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 22px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.locateBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-float);
 }

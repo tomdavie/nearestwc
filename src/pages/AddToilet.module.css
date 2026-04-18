@@ -327,6 +327,15 @@
   margin-top: 10px;
 }
 
+.photoPreview {
+  margin-top: 10px;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
 .celebrateOverlay {
   position: fixed;
   inset: 0;

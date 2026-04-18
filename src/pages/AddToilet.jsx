@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
 import { incrementUserPoints } from '../lib/userPoints'
+import { uploadToiletPhoto } from '../lib/storageUploads'
 import { useNavigate } from 'react-router-dom'
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
 import { useToast } from '../context/useToast'
+import BackButton from '../components/BackButton'
 import styles from './AddToilet.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
@@ -25,6 +27,8 @@ function AddToilet() {
   const [openingHours, setOpeningHours] = useState(defaultSchedule)
   const [accessCode, setAccessCode] = useState('')
   const [description, setDescription] = useState('')
+  const [toiletPhoto, setToiletPhoto] = useState(null)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
   const [position, setPosition] = useState(null)
   const [isFree, setIsFree] = useState(true)
   const [cost, setCost] = useState('')
@@ -49,6 +53,12 @@ function AddToilet() {
       setUser(data.user)
     })
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+    }
+  }, [photoPreviewUrl])
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -115,6 +125,14 @@ function AddToilet() {
             return acc
           }, {}),
         }
+    let toiletPhotoUrl = null
+    if (toiletPhoto) {
+      try {
+        toiletPhotoUrl = await uploadToiletPhoto(toiletPhoto, user.id)
+      } catch (err) {
+        showToast(err?.message || 'Could not upload toilet photo.', 'error')
+      }
+    }
     setSubmitting(true)
     const { error } = await supabase.from('toilets').insert([
       {
@@ -132,6 +150,7 @@ function AddToilet() {
         opening_hours: JSON.stringify(openingHoursPayload),
         access_code: accessCode.trim() || null,
         description: description.trim() || null,
+        photo_url: toiletPhotoUrl,
       },
     ])
     setSubmitting(false)
@@ -152,8 +171,22 @@ function AddToilet() {
 
   const center = position || defaultCenter
 
+  const onToiletPhotoChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setToiletPhoto(null)
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+      setPhotoPreviewUrl('')
+      return
+    }
+    setToiletPhoto(file)
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+    setPhotoPreviewUrl(URL.createObjectURL(file))
+  }
+
   return (
     <div className={styles.page}>
+      <BackButton />
       {celebrate && (
         <div className={styles.celebrateOverlay} role="status" aria-live="polite">
           <div className={styles.celebrateCard}>
@@ -283,6 +316,19 @@ function AddToilet() {
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
           />
+          <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-photo">
+            Exterior photo (optional)
+          </label>
+          <input
+            id="wc-photo"
+            className={styles.field}
+            type="file"
+            accept="image/*"
+            onChange={onToiletPhotoChange}
+          />
+          {photoPreviewUrl && (
+            <img className={styles.photoPreview} src={photoPreviewUrl} alt="Toilet exterior preview" />
+          )}
         </div>
 
         <div className={styles.card}>

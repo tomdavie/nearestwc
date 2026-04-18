@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
+import BackButton from '../components/BackButton'
 import styles from './Login.module.css'
 
 function Login() {
@@ -29,6 +30,7 @@ function Login() {
 
   return (
     <div className={styles.page}>
+      <BackButton />
       <div className={styles.card}>
         <div className={styles.logoRow}>
           <span className={styles.mark} aria-hidden>
@@ -77,6 +79,12 @@ function Login() {
           <button className={styles.primaryBtn} type="submit">
             {isSignUp ? 'Sign up' : 'Next'}
           </button>
+          {isSignUp && (
+            <p className={styles.legalNote}>
+              By signing up you agree to our <Link to="/terms">Terms of Use</Link> and{' '}
+              <Link to="/privacy">Privacy Policy</Link>.
+            </p>
+          )}
         </form>
 
         <p className={styles.switch}>

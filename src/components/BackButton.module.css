@@ -1,0 +1,20 @@
+.backBtn {
+  position: fixed;
+  top: calc(var(--navbar-offset) + 8px);
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 120;
+  border: 1px solid var(--color-border-light);
+  background: #fff;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.backBtn:hover {
+  color: var(--color-primary);
+  border-color: rgba(26, 115, 232, 0.28);
+}

@@ -1,0 +1,234 @@
+.page {
+  min-height: 100dvh;
+  padding: calc(var(--navbar-offset) + 48px) 16px max(24px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.loading {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+
+.card {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.summaryGrid div {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  text-align: center;
+}
+
+.summaryGrid strong {
+  display: block;
+  font-size: 18px;
+}
+
+.summaryGrid span {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.map {
+  width: 100%;
+  height: 200px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pill,
+.pillFree {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-light);
+  background: var(--color-surface);
+}
+
+.pillFree {
+  background: rgba(24, 128, 56, 0.12);
+  border-color: rgba(24, 128, 56, 0.24);
+  color: #137333;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 6px 0 8px;
+}
+
+.row {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 4px;
+}
+
+.codeBox {
+  margin-top: 8px;
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.codeBox button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: #fff;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.description {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.cta {
+  margin-top: 12px;
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #fff;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reviewCard {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  margin-top: 8px;
+}
+
+.reviewMeta {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.reviewBody {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+
+.thumb {
+  margin-top: 8px;
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.thumbLarge {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+
+.helpfulBtn {
+  margin-top: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--color-text-secondary);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+}
+
+.form label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  display: grid;
+  gap: 6px;
+}
+
+.form input[type='number'],
+.form textarea,
+.form input[type='file'],
+.form button {
+  font-family: inherit;
+}
+
+.form input[type='number'],
+.form textarea {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.form button {
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: #fff;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.photoModal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  border: none;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+}
+
+.photoModal img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { BADGES, getLevelFromPoints, getProgressToNextLevel } from '../utils/points'
-import { fetchUserPointsRow } from '../lib/userGamification'
+import { BADGES, getLevelFromPoints, getProgressToNextLevel, normaliseBadges } from '../utils/points'
 import { USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
+import BackButton from '../components/BackButton'
 import styles from './Profile.module.css'
 
 const BADGE_ORDER = ['pioneer', 'inspector', 'diamond_throne', 'globetrotter', 'always_prepared']
 
 const LOCK_HINTS = {
-  pioneer: 'Be the first to list a WC in a city — cartography with consequences.',
-  inspector: 'Review 10 WCs. Field work beats desk work.',
-  diamond_throne: 'Review 50 WCs. You will know things.',
-  globetrotter: 'Add WCs in 3+ countries. Pack snacks.',
-  always_prepared: 'Confirm toilet roll available 10 times in reviews.',
+  pioneer: 'Add the first WC in a city to unlock.',
+  inspector: 'Review 10 WCs to unlock.',
+  diamond_throne: 'Review 50 WCs to unlock.',
+  globetrotter: 'Add WCs in 3+ countries to unlock.',
+  always_prepared: 'Confirm toilet roll available 10 times to unlock.',
 }
 
 function Profile() {
@@ -22,204 +22,206 @@ function Profile() {
   const [loading, setLoading] = useState(true)
   const [loggingOut, setLoggingOut] = useState(false)
   const [pointsRow, setPointsRow] = useState(null)
-  const [toiletsAdded, setToiletsAdded] = useState(0)
-  const [reviewsLeft, setReviewsLeft] = useState(0)
+  const [reviewCount, setReviewCount] = useState(0)
+  const [toiletCount, setToiletCount] = useState(0)
   const [recentReviews, setRecentReviews] = useState([])
 
   const loadProfile = useCallback(async (uid) => {
     if (!uid) return
-    const [row, wcCountRes, revCountRes, feedRes] = await Promise.all([
-      fetchUserPointsRow(uid),
-      supabase.from('toilets').select('*', { count: 'exact', head: true }).eq('added_by', uid),
-      supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('user_id', uid),
+
+    const [pointsRes, reviewsRes, toiletsRes] = await Promise.all([
+      supabase
+        .from('user_points')
+        .select('points, level, badges, review_count, toilet_count')
+        .eq('user_id', uid)
+        .maybeSingle(),
       supabase
         .from('reviews')
-        .select('id, comment, cleanliness, overall_rating, rating, created_at, toilet_id')
+        .select('id, comment, overall_rating, rating, created_at, toilet_id')
         .eq('user_id', uid)
         .order('created_at', { ascending: false })
-        .limit(20),
+        .limit(5),
+      Promise.all([
+        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('user_id', uid),
+        supabase.from('toilets').select('*', { count: 'exact', head: true }).eq('added_by', uid),
+      ]),
     ])
 
-    setPointsRow(row)
-    setToiletsAdded(wcCountRes.count ?? 0)
-    setReviewsLeft(revCountRes.count ?? 0)
+    const pointsData = pointsRes.data || null
+    setPointsRow(pointsData)
 
-    const rows = feedRes.data || []
+    const reviewFallbackCount = toiletsRes[0].count ?? 0
+    const toiletFallbackCount = toiletsRes[1].count ?? 0
+    setReviewCount(Number(pointsData?.review_count) || reviewFallbackCount)
+    setToiletCount(Number(pointsData?.toilet_count) || toiletFallbackCount)
+
+    const rows = reviewsRes.data || []
     const toiletIds = [...new Set(rows.map((r) => r.toilet_id).filter(Boolean))]
-    let nameById = {}
-    if (toiletIds.length) {
+    let toiletNames = {}
+    if (toiletIds.length > 0) {
       const { data: toilets } = await supabase.from('toilets').select('id, name').in('id', toiletIds)
-      nameById = Object.fromEntries((toilets || []).map((t) => [t.id, t.name]))
+      toiletNames = Object.fromEntries((toilets || []).map((t) => [t.id, t.name]))
     }
-    setRecentReviews(rows.map((r) => ({ ...r, toiletName: nameById[r.toilet_id] || 'A WC somewhere' })))
+    setRecentReviews(rows.map((r) => ({ ...r, toiletName: toiletNames[r.toilet_id] || 'Unknown WC' })))
   }, [])
 
   useEffect(() => {
-    let alive = true
+    let active = true
     supabase.auth.getUser().then(({ data }) => {
-      if (!alive) return
-      const u = data.user
-      setUser(u)
-      if (!u) {
+      if (!active) return
+      const nextUser = data.user
+      setUser(nextUser)
+      if (!nextUser) {
         setLoading(false)
         navigate('/login')
         return
       }
-      loadProfile(u.id).finally(() => {
-        if (alive) setLoading(false)
+      loadProfile(nextUser.id).finally(() => {
+        if (active) setLoading(false)
       })
     })
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = session?.user ?? null
-      setUser(u)
-      if (!u) navigate('/login')
-      else loadProfile(u.id)
+      const nextUser = session?.user ?? null
+      setUser(nextUser)
+      if (!nextUser) {
+        navigate('/login')
+      } else {
+        loadProfile(nextUser.id)
+      }
     })
     return () => {
-      alive = false
+      active = false
       subscription.unsubscribe()
     }
   }, [loadProfile, navigate])
 
   useEffect(() => {
-    const onPts = () => {
+    const onPointsUpdate = () => {
       supabase.auth.getUser().then(({ data }) => {
         if (data.user?.id) loadProfile(data.user.id)
       })
     }
-    window.addEventListener(USER_POINTS_CHANGED_EVENT, onPts)
-    return () => window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPts)
+    window.addEventListener(USER_POINTS_CHANGED_EVENT, onPointsUpdate)
+    return () => window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPointsUpdate)
   }, [loadProfile])
 
   const points = Number(pointsRow?.points) || 0
-  const level = useMemo(() => getLevelFromPoints(points), [points])
-  const progress = useMemo(() => getProgressToNextLevel(points), [points])
-
-  const earned = useMemo(() => {
-    const raw = pointsRow?.badges
-    const arr = Array.isArray(raw) ? raw.map(String) : []
-    return new Set(arr)
-  }, [pointsRow])
+  const resolvedLevel = useMemo(() => {
+    if (pointsRow?.level) {
+      const fromPoints = getLevelFromPoints(points)
+      return fromPoints.id === pointsRow.level ? fromPoints : fromPoints
+    }
+    return getLevelFromPoints(points)
+  }, [points, pointsRow?.level])
+  const nextLevel = useMemo(() => getProgressToNextLevel(points), [points])
 
   const progressPct = useMemo(() => {
-    if (!progress) return 100
-    const denom = progress.next.min - level.min
-    if (denom <= 0) return 100
-    const num = points - level.min
-    return Math.min(100, Math.max(4, (num / denom) * 100))
-  }, [progress, points, level])
+    if (!nextLevel) return 100
+    const levelSpan = nextLevel.next.min - resolvedLevel.min
+    if (levelSpan <= 0) return 100
+    const currentProgress = points - resolvedLevel.min
+    return Math.min(100, Math.max(0, (currentProgress / levelSpan) * 100))
+  }, [nextLevel, points, resolvedLevel.min])
+
+  const earnedBadges = useMemo(() => new Set(normaliseBadges(pointsRow?.badges)), [pointsRow?.badges])
 
   const handleLogout = async () => {
     setLoggingOut(true)
     await supabase.auth.signOut()
     setLoggingOut(false)
-    navigate('/login')
+    navigate('/')
   }
 
-  if (loading && !user) {
+  if (loading) {
     return (
       <div className={styles.page}>
-        <p className={styles.loading}>Loading your dossier…</p>
+        <p className={styles.loading}>Loading your Throne Report…</p>
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
+  if (!user) return null
 
   return (
     <div className={styles.page}>
-      <div className={styles.hero}>
-        <p className={styles.heroSub}>Your throne report</p>
+      <BackButton />
+      <section className={styles.hero}>
+        <p className={styles.heroSub}>Your Throne Report 🚽</p>
         <h1 className={styles.heroLevel}>
-          {level.emoji} {level.name}
+          {resolvedLevel.emoji} {resolvedLevel.name}
         </h1>
-        {progress ? (
-          <>
-            <div className={styles.progressTrack}>
-              <div className={styles.progressFill} style={{ width: `${progressPct}%` }} />
-            </div>
-            <p className={styles.progressCaption}>
-              {progress.remaining}pts to {progress.next.emoji} {progress.next.name}
-            </p>
-          </>
-        ) : (
-          <p className={styles.progressCaption}>Peak porcelain. No higher throne. Yet.</p>
-        )}
-        <button
-          type="button"
-          className={styles.logoutBtn}
-          onClick={handleLogout}
-          disabled={loggingOut}
-        >
-          {loggingOut ? 'Logging out…' : 'Log out'}
-        </button>
-      </div>
+        <div className={styles.progressTrack}>
+          <div className={styles.progressFill} style={{ width: `${progressPct}%` }} />
+        </div>
+        <p className={styles.progressCaption}>
+          {nextLevel
+            ? `${nextLevel.remaining}pts to ${nextLevel.next.emoji} ${nextLevel.next.name} (${Math.round(progressPct)}%)`
+            : 'Max level reached. You are now toilet royalty.'}
+        </p>
+      </section>
 
-      <h2 className={styles.sectionTitle}>Your contribution to humanity</h2>
+      <h2 className={styles.sectionTitle}>Your Contribution to Humanity 🌍</h2>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <div className={styles.statValue}>{points}</div>
           <div className={styles.statLabel}>Points</div>
         </div>
         <div className={styles.statCard}>
-          <div className={styles.statValue}>{toiletsAdded}</div>
+          <div className={styles.statValue}>{toiletCount}</div>
           <div className={styles.statLabel}>WCs added</div>
         </div>
         <div className={styles.statCard}>
-          <div className={styles.statValue}>{reviewsLeft}</div>
-          <div className={styles.statLabel}>Reviews left</div>
+          <div className={styles.statValue}>{reviewCount}</div>
+          <div className={styles.statLabel}>Reviews</div>
         </div>
       </div>
 
-      <h2 className={styles.sectionTitle}>Badges of honour</h2>
+      <h2 className={styles.sectionTitle}>Badges of Honour 🏅</h2>
       <div className={styles.badgeGrid}>
-        {BADGE_ORDER.map((id) => {
-          const b = BADGES[id]
-          const has = earned.has(id)
+        {BADGE_ORDER.map((badgeId) => {
+          const badge = BADGES[badgeId]
+          const unlocked = earnedBadges.has(badgeId)
           return (
-            <div
-              key={id}
-              className={`${styles.badgeCard} ${has ? '' : styles.badgeCardLocked}`}
+            <article
+              key={badgeId}
+              className={`${styles.badgeCard} ${unlocked ? '' : styles.badgeCardLocked}`}
             >
-              <div className={styles.badgeEmoji}>{b.emoji}</div>
-              <div className={styles.badgeName}>{b.name}</div>
-              <div className={styles.badgeDesc}>{b.description}</div>
-              {!has && <p className={styles.badgeHint}>{LOCK_HINTS[id]}</p>}
-            </div>
+              <div className={styles.badgeEmoji}>{badge.emoji}</div>
+              <div className={styles.badgeName}>{badge.name}</div>
+              <div className={styles.badgeDesc}>{badge.description}</div>
+              {!unlocked && (
+                <p className={styles.badgeHint}>
+                  <span className={styles.lockIcon}>🔒</span> {LOCK_HINTS[badgeId]}
+                </p>
+              )}
+            </article>
           )
         })}
       </div>
 
-      <h2 className={styles.sectionTitle}>Recent dispatches</h2>
+      <h2 className={styles.sectionTitle}>Your Reviews</h2>
       {recentReviews.length === 0 ? (
-        <p className={styles.muted}>No reviews yet. The field awaits your clipboard energy.</p>
+        <p className={styles.muted}>No reviews yet. Your clipboard awaits.</p>
       ) : (
         <ul className={styles.feed}>
-          {recentReviews.map((r) => {
-            const overall = r.overall_rating ?? r.rating
+          {recentReviews.map((review) => {
+            const stars = Number(review.overall_rating ?? review.rating) || 0
             return (
-              <li key={r.id} className={styles.feedCard}>
-                <p className={styles.feedMeta}>{r.toiletName}</p>
-                <p className={styles.feedBody}>
-                  Overall {Number(overall) || '—'}/5
-                  {r.cleanliness != null && ` · Cleanliness ${Number(r.cleanliness)}/5`}
-                </p>
-                {r.comment && <p className={styles.feedBody}>{r.comment}</p>}
+              <li key={review.id} className={styles.feedCard}>
+                <p className={styles.feedMeta}>{review.toiletName}</p>
+                <p className={styles.feedBody}>{'⭐'.repeat(stars)} ({stars}/5)</p>
+                <p className={styles.feedBody}>{review.comment || 'No comment left.'}</p>
               </li>
             )
           })}
         </ul>
       )}
 
-      <p className={styles.muted} style={{ marginTop: 28 }}>
-        <Link className={styles.loginLink} to="/">
-          Back to the map
-        </Link>
-      </p>
+      <button type="button" className={styles.logoutBtnBottom} onClick={handleLogout} disabled={loggingOut}>
+        {loggingOut ? 'Logging out…' : 'Log out'}
+      </button>
     </div>
   )
 }
