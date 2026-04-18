@@ -136,21 +136,3 @@
   outline: 2px solid #fff;
   outline-offset: 3px;
 }
-
-.infoTitle {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.infoRow {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.45;
-}
-
-.infoRow + .infoRow {
-  margin-top: 4px;
-}

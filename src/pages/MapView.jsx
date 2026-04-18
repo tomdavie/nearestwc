@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
 import { supabase } from '../supabaseClient'
+import ToiletDetail from '../components/ToiletDetail'
 import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
@@ -86,30 +87,11 @@ function MapView() {
           />
         ))}
 
-        {selected && (
-          <InfoWindow
-            position={{ lat: selected.lat, lng: selected.lng }}
-            onCloseClick={() => setSelected(null)}
-          >
-            <div>
-              <h3 className={styles.infoTitle}>{selected.name}</h3>
-              <p className={styles.infoRow}>{selected.is_free ? 'Free to use' : 'Paid access'}</p>
-              {selected.is_accessible && (
-                <p className={styles.infoRow}>Wheelchair accessible</p>
-              )}
-              {selected.requires_key && (
-                <p className={styles.infoRow}>Key or code required</p>
-              )}
-              {selected.gender_neutral && (
-                <p className={styles.infoRow}>All-gender</p>
-              )}
-              {selected.baby_changing && (
-                <p className={styles.infoRow}>Baby changing</p>
-              )}
-            </div>
-          </InfoWindow>
-        )}
       </GoogleMap>
+
+      {selected && (
+        <ToiletDetail key={selected.id} toilet={selected} onClose={() => setSelected(null)} />
+      )}
 
       <div className={styles.floatingBar}>
         <div className={styles.searchCard}>
