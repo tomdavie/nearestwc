@@ -45,15 +45,32 @@ function StarRow({ value, max = 5, size = 'md' }) {
   )
 }
 
-function ToiletDetail({ toilet, onClose }) {
+function ToiletDetail({ toilet, onClose, user }) {
   const { showToast } = useToast()
   const [reviews, setReviews] = useState([])
   const [loadingReviews, setLoadingReviews] = useState(true)
-  const [user, setUser] = useState(null)
+  const [exiting, setExiting] = useState(false)
   const [newRating, setNewRating] = useState(5)
   const [newComment, setNewComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const dragStartY = useRef(null)
+
+  const requestClose = useCallback(() => {
+    if (exiting) return
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      onClose()
+      return
+    }
+    setExiting(true)
+  }, [exiting, onClose])
+
+  const handleSheetAnimationEnd = (e) => {
+    if (e.target !== e.currentTarget) return
+    if (exiting) onClose()
+  }
 
   const loadReviews = useCallback(async () => {
     if (!toilet?.id) return
@@ -74,26 +91,16 @@ function ToiletDetail({ toilet, onClose }) {
   }, [toilet?.id, showToast])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
     loadReviews()
   }, [loadReviews])
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [requestClose])
 
   const averageRating = useMemo(() => {
     if (!reviews.length) return null
@@ -142,7 +149,7 @@ function ToiletDetail({ toilet, onClose }) {
   const onHandleTouchEnd = (e) => {
     if (dragStartY.current == null) return
     const end = e.changedTouches[0]?.clientY
-    if (end != null && end - dragStartY.current > 64) onClose()
+    if (end != null && end - dragStartY.current > 64) requestClose()
     dragStartY.current = null
   }
 
@@ -150,9 +157,15 @@ function ToiletDetail({ toilet, onClose }) {
 
   return (
     <>
-      <div className={styles.backdrop} onClick={onClose} aria-hidden />
+      <div className={styles.backdrop} onClick={requestClose} aria-hidden />
 
-      <div className={styles.sheet} role="dialog" aria-modal="true" aria-labelledby="toilet-detail-title">
+      <div
+        className={`${styles.sheet} ${exiting ? styles.sheetExit : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="toilet-detail-title"
+        onAnimationEnd={handleSheetAnimationEnd}
+      >
         <div className={styles.header}>
           <div
             className={styles.dragZone}
@@ -162,7 +175,7 @@ function ToiletDetail({ toilet, onClose }) {
           >
             <span className={styles.handle} />
           </div>
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close details">
+          <button type="button" className={styles.closeBtn} onClick={requestClose} aria-label="Close details">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M6 6l12 12M18 6L6 18"

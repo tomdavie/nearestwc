@@ -5,17 +5,7 @@
   top: var(--navbar-offset);
   bottom: 0;
   z-index: 80;
-  background: rgba(32, 33, 36, 0.38);
-  animation: fadeIn 0.2s ease forwards;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  background: transparent;
 }
 
 .sheet {
@@ -43,15 +33,28 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .backdrop {
-    animation: none;
-    opacity: 1;
+@keyframes sheetDown {
+  from {
+    transform: translateY(0);
   }
+  to {
+    transform: translateY(104%);
+  }
+}
 
+.sheetExit {
+  animation: sheetDown 0.34s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
   .sheet {
     animation: none;
     transform: translateY(0);
+  }
+
+  .sheetExit {
+    animation: none;
+    transform: translateY(104%);
   }
 }
 

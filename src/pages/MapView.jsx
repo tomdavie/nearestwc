@@ -21,6 +21,7 @@ function SearchIcon() {
 function MapView() {
   const [toilets, setToilets] = useState([])
   const [selected, setSelected] = useState(null)
+  const [user, setUser] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [query, setQuery] = useState('')
   const [freeOnly, setFreeOnly] = useState(false)
@@ -45,6 +46,16 @@ function MapView() {
       if (!error) setToilets(data)
     }
     fetchToilets()
+  }, [])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
   }, [])
 
   const filtered = useMemo(() => {
@@ -90,7 +101,12 @@ function MapView() {
       </GoogleMap>
 
       {selected && (
-        <ToiletDetail key={selected.id} toilet={selected} onClose={() => setSelected(null)} />
+        <ToiletDetail
+          key={selected.id}
+          toilet={selected}
+          user={user}
+          onClose={() => setSelected(null)}
+        />
       )}
 
       <div className={styles.floatingBar}>
