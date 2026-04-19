@@ -1,16 +1,35 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
 import BackButton from '../components/BackButton'
 import styles from './Login.module.css'
 
+/** Same-app path only; blocks protocol-relative and absolute URLs. */
+function safeRedirectPath(raw) {
+  if (!raw || typeof raw !== 'string') return null
+  let path = raw.trim()
+  try {
+    path = decodeURIComponent(path)
+  } catch {
+    return null
+  }
+  if (!path.startsWith('/') || path.startsWith('//')) return null
+  return path
+}
+
 function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { showToast } = useToast()
+
+  const redirectAfterLogin = useMemo(
+    () => safeRedirectPath(searchParams.get('redirect')),
+    [searchParams],
+  )
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,7 +42,8 @@ function Login() {
       if (error) showToast(error.message, 'error')
       else {
         showToast('Welcome back.', 'success')
-        setTimeout(() => navigate('/'), 600)
+        const dest = redirectAfterLogin ?? '/'
+        setTimeout(() => navigate(dest), 600)
       }
     }
   }

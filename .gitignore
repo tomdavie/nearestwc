@@ -1,4 +1,10 @@
 .env
+seed-toilets.mjs
+osm-dumps/
+.seed-state/
+tmp-dumps/
+tmp-progress.json
+tmp-global-urls.txt
 
 # Logs
 logs

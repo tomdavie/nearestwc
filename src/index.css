@@ -19,7 +19,7 @@
   --radius-full: 9999px;
   --navbar-height: 56px;
   --navbar-offset: calc(env(safe-area-inset-top, 0px) + var(--navbar-height));
-  --font-sans: 'Google Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   color-scheme: only light;
   font-family: var(--font-sans);
   font-size: 16px;
@@ -38,8 +38,13 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
+  padding: 0;
   min-height: 100dvh;
 }
 
@@ -47,6 +52,7 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0;
+  padding: 0;
   min-height: 100dvh;
   text-align: left;
 }

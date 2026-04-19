@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
 import { notifyUserPointsChanged } from '../lib/pointsEvents'
@@ -9,129 +9,126 @@ function ProSuccess() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const [status, setStatus] = useState('loading')
+  const [line, setLine] = useState('Waiting for your session…')
+  const activatedRef = useRef(false)
 
   useEffect(() => {
     let mounted = true
+    let timeoutId = null
 
-    const markPro = async () => {
-      console.log('[ProSuccess] Step 1: starting Pro activation flow')
+    const thirtyDaysFromNow = () => {
+      const d = new Date()
+      d.setDate(d.getDate() + 30)
+      return d.toISOString()
+    }
 
-      const { data: authData, error: authError } = await supabase.auth.getUser()
-      console.log('[ProSuccess] Step 2: supabase.auth.getUser()', {
-        userId: authData?.user?.id,
-        authError,
-      })
+    const activatePro = async (user) => {
+      if (!user?.id || activatedRef.current) return
+      activatedRef.current = true
+      if (timeoutId != null) window.clearTimeout(timeoutId)
+      if (mounted) {
+        setLine('Session confirmed — activating your Pro account…')
+        setStatus('activating')
+      }
+
+      const proExpiresAt = thirtyDaysFromNow()
+
+      const { data, error } = await supabase
+        .from('user_points')
+        .upsert(
+          {
+            user_id: user.id,
+            is_pro: true,
+            pro_expires_at: proExpiresAt,
+          },
+          { onConflict: 'user_id' },
+        )
+        .select('user_id, is_pro, pro_expires_at')
+        .maybeSingle()
 
       if (!mounted) return
 
-      if (authError || !authData?.user) {
-        console.log('[ProSuccess] Step 3: no logged-in user, redirecting to login')
-        navigate('/login')
+      if (error) {
+        console.error('[ProSuccess] upsert failed', error)
+        activatedRef.current = false
+        setLine(`Could not save Pro status: ${error.message}`)
+        setStatus('error')
+        showToast(error.message || 'Could not activate Pro.', 'error')
         return
       }
 
-      const userId = authData.user.id
-      const proExpiresAt = new Date()
-      proExpiresAt.setDate(proExpiresAt.getDate() + 30)
-      const proExpiresIso = proExpiresAt.toISOString()
-      console.log('[ProSuccess] Step 4: computed pro_expires_at (30 days)', proExpiresIso)
-
-      const { data: existing, error: selectError } = await supabase
-        .from('user_points')
-        .select('user_id')
-        .eq('user_id', userId)
-        .maybeSingle()
-
-      console.log('[ProSuccess] Step 5: check existing user_points row', { existing, selectError })
-
-      if (selectError) {
-        console.error('[ProSuccess] Step 5b: select failed', selectError)
-        if (mounted) {
-          setStatus('error')
-          showToast(selectError.message || 'Could not read your profile.', 'error')
-        }
-        return
-      }
-
-      if (existing) {
-        console.log('[ProSuccess] Step 6a: updating existing row — is_pro true, pro_expires_at set')
-        const { data: updated, error: updateError } = await supabase
-          .from('user_points')
-          .update({ is_pro: true, pro_expires_at: proExpiresIso })
-          .eq('user_id', userId)
-          .select('user_id, is_pro, pro_expires_at')
-          .maybeSingle()
-
-        console.log('[ProSuccess] Step 7a: update result', { updated, updateError })
-
-        if (updateError) {
-          console.error('[ProSuccess] Step 7a failed', updateError)
-          if (mounted) {
-            setStatus('error')
-            showToast(updateError.message || 'Could not activate Pro on your account.', 'error')
-          }
-          return
-        }
-      } else {
-        console.log('[ProSuccess] Step 6b: inserting new user_points row')
-        const { data: inserted, error: insertError } = await supabase
-          .from('user_points')
-          .insert({
-            user_id: userId,
-            points: 0,
-            level: 'desperate_dan',
-            badges: [],
-            is_pro: true,
-            pro_expires_at: proExpiresIso,
-          })
-          .select('user_id, is_pro, pro_expires_at')
-          .maybeSingle()
-
-        console.log('[ProSuccess] Step 7b: insert result', { inserted, insertError })
-
-        if (insertError) {
-          console.error('[ProSuccess] Step 7b failed', insertError)
-          if (mounted) {
-            setStatus('error')
-            showToast(insertError.message || 'Could not create your Pro profile.', 'error')
-          }
-          return
-        }
-      }
-
-      console.log('[ProSuccess] Step 8: Pro status saved — notifying app and showing success')
+      console.log('[ProSuccess] upsert ok', data)
+      if (mounted) setLine('Pro saved — you’re all set!')
       notifyUserPointsChanged()
-
       if (mounted) setStatus('success')
     }
 
-    markPro().catch((err) => {
-      console.error('[ProSuccess] Unexpected error in markPro', err)
-      if (mounted) {
-        setStatus('error')
-        showToast(err?.message || 'Something went wrong activating Pro.', 'error')
+    const trySession = async (session, source) => {
+      if (!mounted || activatedRef.current) return
+      if (session?.user) {
+        if (timeoutId != null) window.clearTimeout(timeoutId)
+        if (mounted) setLine(`Session ready (${source}) — activating…`)
+        await activatePro(session.user)
       }
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      trySession(session, 'getSession')
     })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
+      if (mounted) setLine(`Auth: ${event} — checking session…`)
+      await trySession(session, `onAuthStateChange:${event}`)
+    })
+
+    timeoutId = window.setTimeout(() => {
+      if (!mounted || activatedRef.current) return
+      setStatus('no_session')
+      setLine('No login session detected yet.')
+    }, 5000)
 
     return () => {
       mounted = false
+      subscription.unsubscribe()
+      if (timeoutId != null) window.clearTimeout(timeoutId)
     }
-  }, [navigate, showToast])
+  }, [showToast])
 
   useEffect(() => {
     if (status !== 'success') return undefined
-    console.log('[ProSuccess] Step 9: success UI shown — redirect to map in 4s')
-    const timer = window.setTimeout(() => {
-      navigate('/')
-    }, 4000)
+    const timer = window.setTimeout(() => navigate('/'), 4000)
     return () => window.clearTimeout(timer)
   }, [status, navigate])
 
-  if (status === 'loading') {
+  if (status === 'loading' || status === 'activating') {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
           <p className={styles.loadingText}>Activating your Pro account…</p>
+          <p className={styles.statusLine}>{line}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'no_session') {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <p className={styles.loadingText}>Having trouble?</p>
+          <p className={styles.sub}>
+            Make sure you are logged in and visit this page again. Returning from Stripe can open a
+            fresh browser context without your NearestWC session.
+          </p>
+          <p className={styles.statusLine}>{line}</p>
+          <p className={styles.meta}>
+            <Link className={styles.retryBtn} to="/login?redirect=/pro-success">
+              Log in and continue to Pro activation
+            </Link>
+          </p>
         </div>
       </div>
     )
@@ -142,7 +139,7 @@ function ProSuccess() {
       <div className={styles.page}>
         <div className={styles.card}>
           <h1 className={styles.title}>Couldn&apos;t activate Pro yet</h1>
-          <p className={styles.sub}>Check the browser console for [ProSuccess] logs, then try again from Profile.</p>
+          <p className={styles.sub}>{line}</p>
           <p className={styles.meta}>
             <button type="button" className={styles.retryBtn} onClick={() => navigate('/profile')}>
               Back to profile
@@ -156,6 +153,7 @@ function ProSuccess() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
+        <p className={styles.statusLine}>{line}</p>
         <h1 className={styles.title}>You&apos;re now a NearestWC Pro. 🚽👑</h1>
         <p className={styles.sub}>Your bowels will thank you.</p>
         <ul className={styles.list}>

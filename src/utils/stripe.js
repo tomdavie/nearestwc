@@ -1,10 +1,20 @@
 /**
- * NearestWC Pro checkout uses a Stripe Payment Link (no Stripe.js / no redirectToCheckout).
+ * NearestWC Pro checkout uses a Stripe Payment Link (no Stripe.js).
  *
- * In Stripe Dashboard: Payment Links → Create → select your NearestWC Pro £1.99/mo product →
- * copy the link (e.g. https://buy.stripe.com/xxxx) and set it below.
+ * IMPORTANT — where the user lands after paying:
+ * Stripe Payment Links do **not** reliably support arbitrary query params on the buy.stripe.com URL
+ * for “success redirects” in app code. The **return URL after checkout is configured in Stripe**:
  *
- * Vite only exposes env vars prefixed with VITE_. Restart the dev server after editing `.env`.
+ * 1. Stripe Dashboard → **Payment Links** → open your NearestWC Pro link → **Settings**
+ * 2. Under **After payment** / confirmation: choose **“Don’t show confirmation page”** (or equivalent)
+ *    and set the **redirect URL** to your deployed app, e.g.
+ *    `https://your-app.vercel.app/pro-success`
+ *    (use your real production URL; for local dev, use something like `http://localhost:5173/pro-success`
+ *    if Stripe allows it, or test against your staging URL).
+ * 3. Optionally use Stripe’s **{CHECKOUT_SESSION_ID}** placeholder in the dashboard if offered for
+ *    server-side verification — the app’s `/pro-success` page activates Pro once the user is logged in.
+ *
+ * Set the link URL in `.env` as `VITE_STRIPE_PAYMENT_LINK` (Vite `VITE_` prefix; restart dev server after edits).
  */
 export function startProCheckout() {
   const url = import.meta.env.VITE_STRIPE_PAYMENT_LINK
@@ -15,5 +25,4 @@ export function startProCheckout() {
     )
   }
   window.location.href = url.trim()
-
 }
