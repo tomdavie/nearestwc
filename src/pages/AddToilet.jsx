@@ -25,17 +25,16 @@ function AddToilet() {
   const [name, setName] = useState('')
   const [isTwentyFourHours, setIsTwentyFourHours] = useState(false)
   const [openingHours, setOpeningHours] = useState(defaultSchedule)
-  const [accessCode, setAccessCode] = useState('')
+  const [accessEntry, setAccessEntry] = useState('free')
+  const [restrictionType, setRestrictionType] = useState('requires_key')
+  const [accessCodeInput, setAccessCodeInput] = useState('')
   const [description, setDescription] = useState('')
   const [toiletPhoto, setToiletPhoto] = useState(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
   const [position, setPosition] = useState(null)
-  const [isFree, setIsFree] = useState(true)
+  const [paymentMethod, setPaymentMethod] = useState('free')
   const [cost, setCost] = useState('')
-  const [acceptsCash, setAcceptsCash] = useState(false)
-  const [acceptsCard, setAcceptsCard] = useState(false)
   const [isAccessible, setIsAccessible] = useState(false)
-  const [requiresKey, setRequiresKey] = useState(false)
   const [babyChanging, setBabyChanging] = useState(false)
   const [user, setUser] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -133,6 +132,30 @@ function AddToilet() {
         showToast(err?.message || 'Could not upload toilet photo.', 'error')
       }
     }
+    const isFree = paymentMethod === 'free'
+    const accepts_card = paymentMethod === 'card'
+    const accepts_cash = paymentMethod === 'cash'
+
+    let requires_key = false
+    let access_code = null
+    let radar_key_accepted = false
+    if (accessEntry === 'restricted') {
+      if (restrictionType === 'requires_key') {
+        requires_key = true
+        access_code = accessCodeInput.trim() || null
+      } else if (restrictionType === 'requires_code') {
+        requires_key = false
+        access_code = accessCodeInput.trim() || null
+      } else if (restrictionType === 'ask_counter') {
+        requires_key = false
+        access_code = null
+      } else if (restrictionType === 'radar_only') {
+        requires_key = true
+        radar_key_accepted = true
+        access_code = accessCodeInput.trim() || null
+      }
+    }
+
     setSubmitting(true)
     const { error } = await supabase.from('toilets').insert([
       {
@@ -142,13 +165,14 @@ function AddToilet() {
         added_by: user.id,
         is_free: isFree,
         cost: isFree ? null : cost.trim() || null,
-        accepts_cash: isFree ? false : acceptsCash,
-        accepts_card: isFree ? false : acceptsCard,
+        accepts_cash: isFree ? false : accepts_cash,
+        accepts_card: isFree ? false : accepts_card,
         is_accessible: isAccessible,
-        requires_key: requiresKey,
+        requires_key,
+        radar_key_accepted,
         baby_changing: babyChanging,
         opening_hours: JSON.stringify(openingHoursPayload),
-        access_code: accessCode.trim() || null,
+        access_code,
         description: description.trim() || null,
         photo_url: toiletPhotoUrl,
       },
@@ -293,18 +317,63 @@ function AddToilet() {
             )}
           </div>
           <p className={styles.scheduleNote}>Closed on all days not listed.</p>
-          <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-code">
-            Access code
-          </label>
-          <input
-            id="wc-code"
-            className={styles.field}
-            type="text"
-            placeholder="e.g. 1234 - leave blank if none"
-            value={accessCode}
-            onChange={(e) => setAccessCode(e.target.value)}
-            autoComplete="off"
-          />
+
+          <span className={`${styles.cardLabel} ${styles.cardLabelFollow}`}>Access &amp; Entry</span>
+          <div className={styles.accessBlock}>
+            <div className={styles.paymentToggleRow}>
+              <button
+                type="button"
+                className={`${styles.paymentToggle} ${accessEntry === 'free' ? styles.paymentToggleActive : ''}`}
+                onClick={() => setAccessEntry('free')}
+              >
+                Freely accessible
+              </button>
+              <button
+                type="button"
+                className={`${styles.paymentToggle} ${accessEntry === 'restricted' ? styles.paymentToggleActive : ''}`}
+                onClick={() => setAccessEntry('restricted')}
+              >
+                Restricted access
+              </button>
+            </div>
+            {accessEntry === 'restricted' && (
+              <div className={styles.accessRestricted}>
+                <label className={styles.accessLabel} htmlFor="restriction-type">
+                  Restriction type
+                </label>
+                <select
+                  id="restriction-type"
+                  className={styles.accessSelect}
+                  value={restrictionType}
+                  onChange={(e) => setRestrictionType(e.target.value)}
+                >
+                  <option value="requires_key">Requires key</option>
+                  <option value="requires_code">Requires code</option>
+                  <option value="ask_counter">Ask at counter</option>
+                  <option value="radar_only">RADAR key only</option>
+                </select>
+                {(restrictionType === 'requires_key' ||
+                  restrictionType === 'requires_code' ||
+                  restrictionType === 'radar_only') && (
+                  <>
+                    <label className={styles.accessLabel} htmlFor="wc-access-code">
+                      Code (if known)
+                    </label>
+                    <input
+                      id="wc-access-code"
+                      className={styles.field}
+                      type="text"
+                      placeholder="Enter code if known"
+                      value={accessCodeInput}
+                      onChange={(e) => setAccessCodeInput(e.target.value)}
+                      autoComplete="off"
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <label className={`${styles.cardLabel} ${styles.cardLabelFollow}`} htmlFor="wc-desc">
             Description
           </label>
@@ -368,54 +437,43 @@ function AddToilet() {
           <span className={styles.cardLabel}>Details</span>
           <div className={styles.paymentBlock}>
             <p className={styles.optionTitle}>Payment</p>
-            <div className={styles.paymentToggleRow}>
+            <div className={styles.paymentPillsRow}>
               <button
                 type="button"
-                className={`${styles.paymentToggle} ${isFree ? styles.paymentToggleActive : ''}`}
-                onClick={() => setIsFree(true)}
+                className={`${styles.paymentPill} ${paymentMethod === 'free' ? styles.paymentToggleActive : ''}`}
+                onClick={() => setPaymentMethod('free')}
               >
-                Free to use
+                Free
               </button>
               <button
                 type="button"
-                className={`${styles.paymentToggle} ${!isFree ? styles.paymentToggleActive : ''}`}
-                onClick={() => setIsFree(false)}
+                className={`${styles.paymentPill} ${paymentMethod === 'card' ? styles.paymentToggleActive : ''}`}
+                onClick={() => setPaymentMethod('card')}
               >
-                Paid
+                Card accepted
+              </button>
+              <button
+                type="button"
+                className={`${styles.paymentPill} ${paymentMethod === 'cash' ? styles.paymentToggleActive : ''}`}
+                onClick={() => setPaymentMethod('cash')}
+              >
+                Cash only
               </button>
             </div>
-            {!isFree && (
+            {(paymentMethod === 'card' || paymentMethod === 'cash') && (
               <div className={styles.paidFields}>
+                <label className={styles.costLabel} htmlFor="wc-cost">
+                  How much? e.g. 50p, £1
+                </label>
                 <input
+                  id="wc-cost"
                   className={styles.field}
                   type="text"
                   value={cost}
                   onChange={(e) => setCost(e.target.value)}
-                  placeholder="e.g. £0.50"
+                  placeholder="e.g. 50p, £1"
                   autoComplete="off"
                 />
-                <label className={styles.option}>
-                  <input
-                    className={styles.checkbox}
-                    type="checkbox"
-                    checked={acceptsCash}
-                    onChange={(e) => setAcceptsCash(e.target.checked)}
-                  />
-                  <span className={styles.optionText}>
-                    <span className={styles.optionTitle}>Cash accepted</span>
-                  </span>
-                </label>
-                <label className={styles.option}>
-                  <input
-                    className={styles.checkbox}
-                    type="checkbox"
-                    checked={acceptsCard}
-                    onChange={(e) => setAcceptsCard(e.target.checked)}
-                  />
-                  <span className={styles.optionText}>
-                    <span className={styles.optionTitle}>Card accepted</span>
-                  </span>
-                </label>
               </div>
             )}
           </div>
@@ -429,18 +487,6 @@ function AddToilet() {
             <span className={styles.optionText}>
               <span className={styles.optionTitle}>Wheelchair accessible</span>
               <span className={styles.optionDesc}>Step-free access and usable facilities</span>
-            </span>
-          </label>
-          <label className={styles.option}>
-            <input
-              className={styles.checkbox}
-              type="checkbox"
-              checked={requiresKey}
-              onChange={(e) => setRequiresKey(e.target.checked)}
-            />
-            <span className={styles.optionText}>
-              <span className={styles.optionTitle}>Key or code required</span>
-              <span className={styles.optionDesc}>Staff, radar key, or door code</span>
             </span>
           </label>
           <label className={styles.option}>

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
+import { USER_POINTS_CHANGED_EVENT } from '../lib/pointsEvents'
 import styles from './UrgentMode.module.css'
 
 function parseOpeningHours(raw) {
@@ -47,25 +48,39 @@ function UrgentMode({ toilets, user }) {
   const [finding, setFinding] = useState(false)
   const [overlay, setOverlay] = useState('')
 
+  const fetchIsPro = useCallback(async () => {
+    console.log('[UrgentMode] Re-fetching is_pro from Supabase')
+    const { data: authData, error: authErr } = await supabase.auth.getUser()
+    console.log('[UrgentMode] auth.getUser()', { userId: authData?.user?.id, authErr })
+    if (!authData?.user?.id) {
+      setIsPro(false)
+      return
+    }
+    const { data, error } = await supabase
+      .from('user_points')
+      .select('is_pro')
+      .eq('user_id', authData.user.id)
+      .maybeSingle()
+    console.log('[UrgentMode] user_points.is_pro', { data, error })
+    setIsPro(Boolean(data?.is_pro))
+  }, [])
+
   useEffect(() => {
-    let active = true
-    const load = async () => {
-      if (!user?.id) {
-        setIsPro(false)
-        return
-      }
-      const { data } = await supabase
-        .from('user_points')
-        .select('is_pro')
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (active) setIsPro(Boolean(data?.is_pro))
+    if (!user?.id) {
+      setIsPro(false)
+      return
     }
-    load()
-    return () => {
-      active = false
+    fetchIsPro()
+  }, [user?.id, fetchIsPro])
+
+  useEffect(() => {
+    const onPointsChanged = () => {
+      console.log('[UrgentMode] USER_POINTS_CHANGED — re-fetching is_pro')
+      fetchIsPro()
     }
-  }, [user?.id])
+    window.addEventListener(USER_POINTS_CHANGED_EVENT, onPointsChanged)
+    return () => window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPointsChanged)
+  }, [fetchIsPro])
 
   const candidates = useMemo(
     () =>

@@ -32,12 +32,13 @@ function Profile() {
 
   const loadProfile = useCallback(async (uid) => {
     if (!uid) return
+    console.log('[Profile] loadProfile: fetching full user_points (fresh, includes is_pro) for', uid)
 
     const [pointsRes, reviewsRes, toiletsRes] = await Promise.all([
       supabase
         .from('user_points')
         .select(
-          'points, level, badges, review_count, toilet_count, is_pro, saved_toilets, condition_profile, radar_key',
+          'points, level, badges, review_count, toilet_count, is_pro, pro_expires_at, saved_toilets, condition_profile, radar_key',
         )
         .eq('user_id', uid)
         .maybeSingle(),
@@ -142,6 +143,38 @@ function Profile() {
     window.addEventListener(USER_POINTS_CHANGED_EVENT, onPointsUpdate)
     return () => window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPointsUpdate)
   }, [loadProfile])
+
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    ;(async () => {
+      console.log('[Profile] Re-fetching is_pro from Supabase on mount (session + row)')
+      const { data: authData, error: authErr } = await supabase.auth.getUser()
+      console.log('[Profile] auth.getUser for is_pro', { userId: authData?.user?.id, authErr })
+      if (!authData?.user?.id || cancelled) return
+      const { data, error } = await supabase
+        .from('user_points')
+        .select('is_pro, pro_expires_at')
+        .eq('user_id', authData.user.id)
+        .maybeSingle()
+      console.log('[Profile] Fresh is_pro / pro_expires_at', { data, error })
+      if (cancelled || error) return
+      setPointsRow((prev) => {
+        if (!prev) {
+          console.log('[Profile] is_pro merge skipped — pointsRow not loaded yet')
+          return prev
+        }
+        return {
+          ...prev,
+          is_pro: data ? Boolean(data.is_pro) : prev.is_pro,
+          pro_expires_at: data?.pro_expires_at ?? prev.pro_expires_at,
+        }
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
 
   const points = Number(pointsRow?.points) || 0
   const isPro = Boolean(pointsRow?.is_pro)

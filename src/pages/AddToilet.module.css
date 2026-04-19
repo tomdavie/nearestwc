@@ -291,11 +291,77 @@
   line-height: 1.4;
 }
 
+.accessBlock {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-top: 4px;
+}
+
+.accessRestricted {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.accessLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.accessSelect {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.accessSelect:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.18);
+}
+
 .paymentBlock {
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
   padding: 12px;
   margin-bottom: 12px;
+}
+
+.paymentPillsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.paymentPill {
+  flex: 1;
+  min-width: min(100%, 140px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: var(--color-text-secondary);
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.costLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
 }
 
 .paymentToggleRow {
