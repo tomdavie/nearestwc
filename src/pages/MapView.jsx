@@ -8,26 +8,20 @@ import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
 
-function getMarkerColor(averageRating) {
-  if (averageRating == null) return '#9aa0a6'
-  if (averageRating <= 2) return '#d93025'
-  if (averageRating < 4) return '#f9ab00'
-  return '#188038'
-}
-
-/** Solid rating-coloured circle + 🚻 (no stroke — avoids the grey “ring” look). */
-function createToiletMarkerIconUrl(color) {
-  const size = 40
-  const r = 18
-  const cx = size / 2
-  const cy = size / 2
+function getMarkerIcon(avgRating) {
+  const color =
+    avgRating >= 4 ? '#22c55e' : avgRating >= 3 ? '#f59e0b' : avgRating > 0 ? '#ef4444' : '#9ca3af'
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>
-      <text x="${cx}" y="${cy + 6}" text-anchor="middle" font-size="15" dominant-baseline="middle">🚻</text>
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="2"/>
+      <text x="20" y="25" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="Arial, sans-serif">WC</text>
     </svg>
   `
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(40, 40),
+    anchor: new window.google.maps.Point(20, 20),
+  }
 }
 
 /** Single solid blue disk for MarkerClustererPlus — text is drawn by the clusterer, not baked into the image. */
@@ -259,11 +253,7 @@ function MapView() {
                 position={{ lat: toilet.lat, lng: toilet.lng }}
                 onClick={() => setSelected(toilet)}
                 options={{ optimized: false }}
-                icon={{
-                  url: createToiletMarkerIconUrl(getMarkerColor(toilet.average_rating)),
-                  scaledSize: new window.google.maps.Size(40, 40),
-                  anchor: new window.google.maps.Point(20, 20),
-                }}
+                icon={getMarkerIcon(toilet.average_rating)}
               />
             ))
           }
