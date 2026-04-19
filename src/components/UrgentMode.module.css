@@ -2,7 +2,7 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: max(88px, env(safe-area-inset-bottom) + 80px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
   z-index: 11;
   border: none;
   border-radius: var(--radius-full);

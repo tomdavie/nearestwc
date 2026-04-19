@@ -126,24 +126,25 @@
 
 .fab {
   position: absolute;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(96px, env(safe-area-inset-bottom) + 92px);
+  right: calc(env(safe-area-inset-right, 0px) + 24px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
   z-index: 10;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: #fff;
+  border: 1px solid var(--color-border-light);
+  background: #fff;
+  color: #1a73e8;
   display: grid;
   place-items: center;
-  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.45), var(--shadow-md);
+  box-shadow: var(--shadow-md);
   text-decoration: none;
-  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .fab:hover {
-  background: var(--color-primary-hover);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-float);
 }
 
 .fab:focus-visible {
@@ -153,8 +154,8 @@
 
 .locateBtn {
   position: absolute;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(20px, env(safe-area-inset-bottom) + 16px);
+  left: calc(env(safe-area-inset-left, 0px) + 24px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
   z-index: 10;
   width: 52px;
   height: 52px;
