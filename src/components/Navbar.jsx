@@ -5,19 +5,6 @@ import { fetchUserPoints, USER_POINTS_CHANGED_EVENT } from '../lib/userPoints'
 import { getLevelFromPoints } from '../utils/points'
 import styles from './Navbar.module.css'
 
-function IconPlus() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 5v14M5 12h14"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 function IconUser() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -93,10 +80,6 @@ function Navbar() {
         <span>NearestWC</span>
       </Link>
       <div className={styles.actions}>
-        <Link to="/add" className={styles.iconLink} title="Add a WC">
-          <IconPlus />
-          <span className={styles.srOnly}>Add WC</span>
-        </Link>
         {sessionUser && points != null ? (
           <Link
             to="/profile"

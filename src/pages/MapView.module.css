@@ -127,7 +127,7 @@
 .fab {
   position: absolute;
   right: max(16px, env(safe-area-inset-right));
-  bottom: max(20px, env(safe-area-inset-bottom) + 16px);
+  bottom: max(96px, env(safe-area-inset-bottom) + 92px);
   z-index: 10;
   width: 56px;
   height: 56px;

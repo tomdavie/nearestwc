@@ -236,7 +236,7 @@ function MapView() {
           fullscreenControl: false,
           mapTypeControl: false,
           streetViewControl: false,
-          zoomControl: true,
+          zoomControl: false,
         }}
       >
         <MarkerClustererF

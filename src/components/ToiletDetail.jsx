@@ -12,6 +12,14 @@ import { uploadReviewPhoto } from '../lib/storageUploads'
 import { getLevelFromPoints } from '../utils/points'
 import styles from './ToiletDetail.module.css'
 
+const REPORT_REASONS = [
+  'Permanently closed',
+  'Wrong location',
+  'Incorrect information',
+  'Offensive content',
+  'Other',
+]
+
 function StarIcon({ filled }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -375,7 +383,7 @@ function ToiletDetail({ toilet, onClose, user }) {
   const markSavedMe = async () => {
     if (savedThisToilet) return
     if (!toilet?.id || !toilet?.added_by || !user) {
-      if (!user) showToast('Login to save this WC.', 'info')
+      if (!user) showToast('Login to use "This saved me".', 'info')
       return
     }
     setSavingToilet(true)
@@ -395,7 +403,7 @@ function ToiletDetail({ toilet, onClose, user }) {
     } catch (err) {
       showToast(err?.message || 'Saved, but points award failed.', 'error')
     }
-    showToast('Saved! Community points delivered. 🙌', 'success')
+    showToast('Saved me! 🙌 Thanks for supporting this contributor.', 'success')
   }
 
   const toggleSavedToilet = async () => {
@@ -437,6 +445,7 @@ function ToiletDetail({ toilet, onClose, user }) {
     setUserMeta((prev) => ({ ...(prev || {}), saved_toilets: next }))
     notifyUserPointsChanged()
     setSavingFavorite(false)
+    showToast(next.includes(toilet.id) ? 'Added to your saved WCs ⭐' : 'Removed from saved WCs', 'success')
   }
 
   const openDirections = () => {
@@ -466,22 +475,22 @@ function ToiletDetail({ toilet, onClose, user }) {
 
   const submitReport = async (e) => {
     e.preventDefault()
-    if (!user) {
-      showToast('Login to report an issue.', 'info')
+    if (!user || !toilet?.id) {
       return
     }
     setSubmittingReport(true)
-    const { error } = await supabase.from('reports').insert([
+    const { data, error } = await supabase.from('reports').insert([
       {
         toilet_id: toilet.id,
         user_id: user.id,
         reason: reportReason,
         details: reportDetails.trim() || null,
-        created_at: new Date().toISOString(),
       },
     ])
+    console.log('[ToiletDetail] report insert response', { data, error })
     setSubmittingReport(false)
     if (error) {
+      console.error('[ToiletDetail] report insert error', error)
       showToast(error.message, 'error')
       return
     }
@@ -570,7 +579,7 @@ function ToiletDetail({ toilet, onClose, user }) {
             onClick={markSavedMe}
             disabled={savingToilet || savedThisToilet}
           >
-            {savedThisToilet ? 'Saved! 🙌 Thanks' : savingToilet ? 'Saving…' : '🙌 This saved me'}
+            {savedThisToilet ? 'Saved me! 🙌' : savingToilet ? 'Saving…' : 'This saved me 🙌'}
           </button>
           {savedThisToilet && <p className={styles.savedNote}>+2 points awarded to the person who added this WC</p>}
           <button
@@ -579,7 +588,7 @@ function ToiletDetail({ toilet, onClose, user }) {
             onClick={toggleSavedToilet}
             disabled={savingFavorite}
           >
-            {savingFavorite ? 'Saving…' : isFavorite ? 'Saved ⭐' : 'Save this WC ⭐'}
+            {savingFavorite ? 'Saving…' : isFavorite ? 'Saved ⭐ Remove' : 'Save this WC ⭐'}
           </button>
           {shouldShowKeyWarning && (
             <p className={styles.keyWarning}>⚠️ This WC requires a key - may not be ideal in an emergency</p>
@@ -860,29 +869,33 @@ function ToiletDetail({ toilet, onClose, user }) {
               🚩 Report an issue
             </button>
             {reportOpen && (
-              <form className={styles.reportForm} onSubmit={submitReport}>
-                <select
-                  className={styles.reportSelect}
-                  value={reportReason}
-                  onChange={(e) => setReportReason(e.target.value)}
-                >
-                  <option>Permanently closed</option>
-                  <option>Wrong location</option>
-                  <option>Incorrect information</option>
-                  <option>Offensive content</option>
-                  <option>Other</option>
-                </select>
-                <textarea
-                  className={styles.textarea}
-                  rows={3}
-                  value={reportDetails}
-                  onChange={(e) => setReportDetails(e.target.value)}
-                  placeholder="Any extra details?"
-                />
-                <button type="submit" className={styles.submit} disabled={submittingReport}>
-                  {submittingReport ? 'Sending…' : 'Send report'}
-                </button>
-              </form>
+              <>
+                {!user ? (
+                  <p className={styles.reportLoginHint}>Please log in to report an issue</p>
+                ) : (
+                  <form className={styles.reportForm} onSubmit={submitReport}>
+                    <select
+                      className={styles.reportSelect}
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                    >
+                      {REPORT_REASONS.map((reason) => (
+                        <option key={reason}>{reason}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      className={styles.textarea}
+                      rows={3}
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value)}
+                      placeholder="Optional extra details"
+                    />
+                    <button type="submit" className={styles.submit} disabled={submittingReport}>
+                      {submittingReport ? 'Sending…' : 'Send report'}
+                    </button>
+                  </form>
+                )}
+              </>
             )}
           </div>
         </div>
