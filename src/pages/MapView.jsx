@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { GoogleMap, useJsApiLoader, Marker, MarkerClustererF } from '@react-google-maps/api'
 import { supabase } from '../supabaseClient'
@@ -7,6 +7,7 @@ import UrgentMode from '../components/UrgentMode'
 import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
+const VIEWPORT_LIMIT = 3000
 
 function getMarkerIcon(avgRating) {
   const color =
@@ -60,6 +61,9 @@ function MapView() {
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [openNowOnly, setOpenNowOnly] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [loadingToilets, setLoadingToilets] = useState(false)
+  const refreshTimerRef = useRef(null)
+  const requestSeqRef = useRef(0)
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
@@ -74,39 +78,106 @@ function MapView() {
     )
   }, [])
 
-  useEffect(() => {
-    const fetchToilets = async () => {
-      const [{ data: toiletsData, error: toiletsError }, { data: reviewsData, error: reviewsError }] =
-        await Promise.all([
-          supabase.from('toilets').select('*'),
-          supabase.from('reviews').select('toilet_id, overall_rating, rating'),
-        ])
+  const fetchToiletsForBounds = useCallback(async (bounds) => {
+    if (!bounds) return
+    const requestId = ++requestSeqRef.current
+    setLoadingToilets(true)
 
-      if (toiletsError) return
+    const { south, west, north, east } = bounds
+    let toiletsQuery = supabase
+      .from('toilets')
+      .select('*')
+      .gte('lat', south)
+      .lte('lat', north)
+      .order('created_at', { ascending: false })
+      .limit(VIEWPORT_LIMIT)
 
-      const averages = {}
-      if (!reviewsError) {
-        for (const review of reviewsData || []) {
-          const score = Number(review.overall_rating ?? review.rating)
-          if (!review.toilet_id || !score) continue
-          const current = averages[review.toilet_id] || { total: 0, count: 0 }
-          current.total += score
-          current.count += 1
-          averages[review.toilet_id] = current
-        }
-      }
-
-      setToilets(
-        (toiletsData || []).map((toilet) => {
-          const rating = averages[toilet.id]
-          return {
-            ...toilet,
-            average_rating: rating ? rating.total / rating.count : null,
-          }
-        }),
-      )
+    // Handle anti-meridian crossing if needed.
+    if (west <= east) {
+      toiletsQuery = toiletsQuery.gte('lng', west).lte('lng', east)
+    } else {
+      toiletsQuery = toiletsQuery.or(`lng.gte.${west},lng.lte.${east}`)
     }
-    fetchToilets()
+
+    const { data: toiletsData, error: toiletsError } = await toiletsQuery
+    if (requestId !== requestSeqRef.current) return
+
+    if (toiletsError) {
+      console.error('[MapView] toilets fetch error', toiletsError)
+      setLoadingToilets(false)
+      return
+    }
+
+    const ids = (toiletsData || []).map((t) => t.id).filter(Boolean)
+    let reviewsData = []
+    if (ids.length > 0) {
+      const { data, error: reviewsError } = await supabase
+        .from('reviews')
+        .select('toilet_id, overall_rating, rating')
+        .in('toilet_id', ids)
+
+      if (requestId !== requestSeqRef.current) return
+      if (reviewsError) {
+        console.error('[MapView] reviews fetch error', reviewsError)
+      } else {
+        reviewsData = data || []
+      }
+    }
+
+    const averages = {}
+    for (const review of reviewsData) {
+      const score = Number(review.overall_rating ?? review.rating)
+      if (!review.toilet_id || !score) continue
+      const current = averages[review.toilet_id] || { total: 0, count: 0 }
+      current.total += score
+      current.count += 1
+      averages[review.toilet_id] = current
+    }
+
+    setToilets(
+      (toiletsData || []).map((toilet) => {
+        const rating = averages[toilet.id]
+        return {
+          ...toilet,
+          average_rating: rating ? rating.total / rating.count : null,
+        }
+      }),
+    )
+    setLoadingToilets(false)
+  }, [])
+
+  const getCurrentBounds = useCallback(() => {
+    if (!map) return null
+    const mapBounds = map.getBounds()
+    if (!mapBounds) return null
+    const northEast = mapBounds.getNorthEast()
+    const southWest = mapBounds.getSouthWest()
+    return {
+      south: southWest.lat(),
+      west: southWest.lng(),
+      north: northEast.lat(),
+      east: northEast.lng(),
+    }
+  }, [map])
+
+  const scheduleViewportRefresh = useCallback(() => {
+    if (!map) return
+    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = window.setTimeout(() => {
+      const bounds = getCurrentBounds()
+      if (bounds) fetchToiletsForBounds(bounds)
+    }, 220)
+  }, [fetchToiletsForBounds, getCurrentBounds, map])
+
+  useEffect(() => {
+    if (!map) return
+    scheduleViewportRefresh()
+  }, [map, scheduleViewportRefresh])
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -232,6 +303,7 @@ function MapView() {
         center={userLocation || defaultCenter}
         zoom={15}
         onLoad={(instance) => setMap(instance)}
+        onIdle={scheduleViewportRefresh}
         options={{
           fullscreenControl: false,
           mapTypeControl: false,
@@ -294,6 +366,7 @@ function MapView() {
             {searching ? '…' : 'Go'}
           </button>
         </form>
+        {loadingToilets && <p className={styles.loadingInline}>Loading toilets in this area…</p>}
         <div className={styles.chips}>
           <button
             type="button"

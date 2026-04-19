@@ -63,6 +63,19 @@
   gap: 10px;
 }
 
+.loadingInline {
+  margin: 0;
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .searchGo {
   border: none;
   border-radius: var(--radius-full);
