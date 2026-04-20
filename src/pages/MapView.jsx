@@ -27,18 +27,17 @@ function getMarkerIcon(avgRating) {
 
 function getSponsoredMarkerIcon() {
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
-      <circle cx="22" cy="22" r="19" fill="#F59E0B" stroke="white" stroke-width="2.5"/>
-      <text x="22" y="28" text-anchor="middle" fill="white" font-size="18" font-weight="700" font-family="Arial, sans-serif">★</text>
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+      <path d="M18 0 C8.06 0 0 8.06 0 18 C0 31.5 18 48 18 48 C18 48 36 31.5 36 18 C36 8.06 27.94 0 18 0 Z" fill="#F59E0B" stroke="white" stroke-width="2"/>
+      <text x="18" y="22" text-anchor="middle" fill="white" font-size="11" font-weight="bold" font-family="Arial, sans-serif">WC</text>
     </svg>
   `
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    scaledSize: new window.google.maps.Size(44, 44),
-    anchor: new window.google.maps.Point(22, 22),
+    scaledSize: new window.google.maps.Size(36, 48),
+    anchor: new window.google.maps.Point(18, 48)
   }
 }
-
 /** Single solid blue disk for MarkerClustererPlus — text is drawn by the clusterer, not baked into the image. */
 function createClusterBackgroundIconUrl() {
   const size = 48
