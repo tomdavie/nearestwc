@@ -9,6 +9,7 @@ import Admin from './pages/Admin'
 import Upgrade from './pages/Upgrade'
 import ProSuccess from './pages/ProSuccess'
 import SafeRoute from './pages/SafeRoute'
+import SponsoredListingInfo from './pages/SponsoredListingInfo'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import Terms from './pages/Terms'
 import NotFound from './pages/NotFound'
@@ -23,7 +24,7 @@ import './App.css'
 function AppShell() {
   const { pathname } = useLocation()
   const isMap = pathname === '/'
-  const showFooter = pathname === '/privacy' || pathname === '/terms'
+  const showFooter = pathname === '/privacy' || pathname === '/terms' || pathname === '/advertise'
 
   return (
     <div className={isMap ? styles.shellMap : styles.shell}>
@@ -37,6 +38,7 @@ function AppShell() {
           <Route path="/upgrade" element={<Upgrade />} />
           <Route path="/pro-success" element={<ProSuccess />} />
           <Route path="/safe-route" element={<SafeRoute />} />
+          <Route path="/advertise" element={<SponsoredListingInfo />} />
           <Route path="/wc/:id" element={<ToiletPage />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />

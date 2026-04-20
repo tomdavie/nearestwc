@@ -25,6 +25,20 @@ function getMarkerIcon(avgRating) {
   }
 }
 
+function getSponsoredMarkerIcon() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+      <circle cx="22" cy="22" r="19" fill="#F59E0B" stroke="white" stroke-width="2.5"/>
+      <text x="22" y="28" text-anchor="middle" fill="white" font-size="18" font-weight="700" font-family="Arial, sans-serif">★</text>
+    </svg>
+  `
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(44, 44),
+    anchor: new window.google.maps.Point(22, 22),
+  }
+}
+
 /** Single solid blue disk for MarkerClustererPlus — text is drawn by the clusterer, not baked into the image. */
 function createClusterBackgroundIconUrl() {
   const size = 48
@@ -53,6 +67,7 @@ function SearchIcon() {
 function MapView() {
   const [toilets, setToilets] = useState([])
   const [selected, setSelected] = useState(null)
+  const [sponsoredListings, setSponsoredListings] = useState([])
   const [user, setUser] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [map, setMap] = useState(null)
@@ -76,6 +91,22 @@ function MapView() {
       },
       () => {},
     )
+  }, [])
+
+  useEffect(() => {
+    const fetchSponsoredListings = async () => {
+      const { data, error } = await supabase
+        .from('sponsored_listings')
+        .select('*')
+        .eq('active', true)
+      if (error) {
+        console.error('[MapView] sponsored_listings fetch error', error)
+        return
+      }
+      console.log('sponsored listings:', data || [])
+      setSponsoredListings(data || [])
+    }
+    fetchSponsoredListings()
   }, [])
 
   const fetchToiletsForBounds = useCallback(async (bounds) => {
@@ -107,6 +138,18 @@ function MapView() {
       setLoadingToilets(false)
       return
     }
+
+    const hasGlasgowToilet = (toiletsData || []).some(
+      (toilet) =>
+        Math.abs(Number(toilet?.lat) - 55.8642) < 0.0002 &&
+        Math.abs(Number(toilet?.lng) - -4.2518) < 0.0002,
+    )
+    console.log(
+      '[MapView] fetched toilets in current bounds:',
+      (toiletsData || []).length,
+      'includes 55.8642,-4.2518:',
+      hasGlasgowToilet,
+    )
 
     const ids = (toiletsData || []).map((t) => t.id).filter(Boolean)
     let reviewsData = []
@@ -223,6 +266,32 @@ function MapView() {
     })
   }, [toilets, freeOnly, accessibleOnly, openNowOnly])
 
+  const isToiletSponsored = useCallback(
+    (toilet) => sponsoredListings.some((s) => s.toilet_id === toilet.id),
+    [sponsoredListings],
+  )
+
+  const handleMarkerClick = useCallback(
+    (toilet, listingOverride = null) => {
+      try {
+        if (!toilet || !toilet.id) return
+        const matchedListing =
+          listingOverride ??
+          sponsoredListings?.find((s) => s?.toilet_id === toilet?.id) ??
+          null
+
+        setSelected({
+          toilet,
+          isSponsored: Boolean(matchedListing),
+          sponsoredListing: matchedListing,
+        })
+      } catch (error) {
+        console.error('[MapView] marker click handler failed', error, toilet)
+      }
+    },
+    [sponsoredListings],
+  )
+
   const locateMe = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -319,25 +388,35 @@ function MapView() {
         >
           {(clusterer) =>
             filtered.map((toilet) => (
-              <Marker
-                key={toilet.id}
-                clusterer={clusterer}
-                position={{ lat: toilet.lat, lng: toilet.lng }}
-                onClick={() => setSelected(toilet)}
-                options={{ optimized: false }}
-                icon={getMarkerIcon(toilet.average_rating)}
-              />
+              (() => {
+                const sponsoredListing =
+                  sponsoredListings?.find((s) => s?.toilet_id === toilet?.id) ?? null
+                const isSponsored = isToiletSponsored(toilet)
+                console.log('rendering marker for toilet:', toilet.id, 'is sponsored:', isSponsored)
+                return (
+                  <Marker
+                    key={toilet.id}
+                    clusterer={clusterer}
+                    position={{ lat: toilet.lat, lng: toilet.lng }}
+                    onClick={() => handleMarkerClick(toilet, sponsoredListing)}
+                    options={{ optimized: false }}
+                    icon={isSponsored ? getSponsoredMarkerIcon() : getMarkerIcon(toilet.average_rating)}
+                  />
+                )
+              })()
             ))
           }
         </MarkerClustererF>
 
       </GoogleMap>
 
-      {selected && (
+      {selected?.toilet?.id && (
         <ToiletDetail
-          key={selected.id}
-          toilet={selected}
+          key={selected.toilet.id}
+          toilet={selected.toilet}
           user={user}
+          isSponsored={Boolean(selected.isSponsored)}
+          sponsoredListing={selected.sponsoredListing ?? null}
           onClose={() => setSelected(null)}
         />
       )}

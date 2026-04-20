@@ -6,6 +6,7 @@ function Footer() {
     <footer className={styles.footer}>
       <span>© 2026 NearestWC</span>
       <nav className={styles.links} aria-label="Legal links">
+        <Link to="/advertise">Advertise with us</Link>
         <Link to="/privacy">Privacy Policy</Link>
         <Link to="/terms">Terms</Link>
       </nav>

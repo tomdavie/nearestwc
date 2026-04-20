@@ -90,7 +90,7 @@ function hasBowelCondition(conditionProfile) {
   )
 }
 
-function ToiletDetail({ toilet, onClose, user }) {
+function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredListing = null }) {
   const { showToast } = useToast()
   const [reviews, setReviews] = useState([])
   const [loadingReviews, setLoadingReviews] = useState(true)
@@ -110,7 +110,8 @@ function ToiletDetail({ toilet, onClose, user }) {
   const [reviewerMeta, setReviewerMeta] = useState({})
   const [helpfulLoadingId, setHelpfulLoadingId] = useState(null)
   const [copiedCode, setCopiedCode] = useState(false)
-  const [reportOpen, setReportOpen] = useState(false)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [showReportForm, setShowReportForm] = useState(false)
   const [reportReason, setReportReason] = useState('Permanently closed')
   const [reportDetails, setReportDetails] = useState('')
   const [submittingReport, setSubmittingReport] = useState(false)
@@ -119,7 +120,22 @@ function ToiletDetail({ toilet, onClose, user }) {
   const [savedThisToilet, setSavedThisToilet] = useState(false)
   const [userMeta, setUserMeta] = useState(null)
   const [savingFavorite, setSavingFavorite] = useState(false)
+  const [showOfferOverlay, setShowOfferOverlay] = useState(false)
   const dragStartY = useRef(null)
+
+  const sponsoredBusinessName =
+    sponsoredListing?.business_name || sponsoredListing?.businessName || toilet?.name || 'Featured Partner'
+  const sponsoredLogoUrl = sponsoredListing?.business_logo_url || sponsoredListing?.businessLogoUrl || ''
+  const sponsoredOfferText =
+    sponsoredListing?.offer_text ||
+    sponsoredListing?.offerText ||
+    'Buy any drink and use our facilities - just show the app at the counter.'
+  const sponsoredInitials = sponsoredBusinessName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('')
 
   useEffect(() => {
     if (!toilet?.id) return
@@ -317,6 +333,7 @@ function ToiletDetail({ toilet, onClose, user }) {
     }
     await loadReviews()
     await refreshPoints()
+    setShowReviewForm(false)
     setSuccessBanner(true)
     window.setTimeout(() => setSuccessBanner(false), 3000)
   }
@@ -475,29 +492,39 @@ function ToiletDetail({ toilet, onClose, user }) {
 
   const submitReport = async (e) => {
     e.preventDefault()
-    if (!user || !toilet?.id) {
+    if (!toilet?.id) return
+
+    const {
+      data: { user: reportUser },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !reportUser) {
+      showToast(userError?.message || 'Please log in to report an issue', 'error')
       return
     }
+
     setSubmittingReport(true)
-    const { data, error } = await supabase.from('reports').insert([
+    const response = await supabase.from('reports').insert([
       {
         toilet_id: toilet.id,
-        user_id: user.id,
+        user_id: reportUser.id,
         reason: reportReason,
         details: reportDetails.trim() || null,
       },
     ])
-    console.log('[ToiletDetail] report insert response', { data, error })
+    console.log('[ToiletDetail] report insert response', response)
     setSubmittingReport(false)
-    if (error) {
-      console.error('[ToiletDetail] report insert error', error)
-      showToast(error.message, 'error')
+
+    if (response.error) {
+      showToast(response.error.message, 'error')
       return
     }
-    setReportOpen(false)
+
+    setShowReportForm(false)
     setReportDetails('')
     setReportReason('Permanently closed')
-    showToast("Thanks for the heads up. We'll look into it. 🔍", 'success')
+    showToast('Thanks for the heads up 🔍', 'success')
   }
 
   if (!toilet) return null
@@ -524,6 +551,20 @@ function ToiletDetail({ toilet, onClose, user }) {
         <button type="button" className={styles.photoModal} onClick={() => setModalPhoto('')}>
           <img src={modalPhoto} alt="Review full size" />
         </button>
+      )}
+      {showOfferOverlay && isSponsored && (
+        <div className={styles.offerOverlay} role="dialog" aria-modal="true" aria-label="Sponsored offer">
+          <div className={styles.offerCard}>
+            <div className={styles.offerLogo}>WC</div>
+            <h3 className={styles.offerBusiness}>{sponsoredBusinessName}</h3>
+            <p className={styles.offerCopy}>{sponsoredOfferText}</p>
+            <div className={styles.offerTick}>✓</div>
+            <p className={styles.offerHelpText}>Show this screen to a member of staff</p>
+            <button type="button" className={styles.offerDismiss} onClick={() => setShowOfferOverlay(false)}>
+              Done
+            </button>
+          </div>
+        </div>
       )}
 
       <div
@@ -555,6 +596,25 @@ function ToiletDetail({ toilet, onClose, user }) {
         </div>
 
         <div className={styles.body}>
+          {isSponsored && (
+            <>
+              <div className={styles.sponsoredBanner}>⭐ Featured Partner</div>
+              <div className={styles.sponsoredCard}>
+                {sponsoredLogoUrl ? (
+                  <img src={sponsoredLogoUrl} alt={`${sponsoredBusinessName} logo`} className={styles.sponsoredLogo} />
+                ) : (
+                  <div className={styles.sponsoredInitials}>{sponsoredInitials || 'WC'}</div>
+                )}
+                <div className={styles.sponsoredText}>
+                  <p className={styles.sponsoredBusinessName}>{sponsoredBusinessName}</p>
+                  <p className={styles.sponsoredOffer}>{sponsoredOfferText}</p>
+                </div>
+              </div>
+              <button type="button" className={styles.offerShowBtn} onClick={() => setShowOfferOverlay(true)}>
+                Show Offer 🎟️
+              </button>
+            </>
+          )}
           {toilet.photo_url && (
             <img className={styles.bannerPhoto} src={toilet.photo_url} alt={`${toilet.name || 'Toilet'} exterior`} />
           )}
@@ -744,7 +804,16 @@ function ToiletDetail({ toilet, onClose, user }) {
           )}
 
           {user ? (
-            <form className={styles.form} onSubmit={handleSubmitReview}>
+            <>
+              <button
+                type="button"
+                className={styles.reportBtn}
+                onClick={() => setShowReviewForm((v) => !v)}
+              >
+                {showReviewForm ? "Hide review form" : "Leave a review"}
+              </button>
+              {showReviewForm && (
+                <form className={styles.form} onSubmit={handleSubmitReview}>
               <div>
                 <p className={styles.fieldLabel} id="cleanliness-label">
                   Cleanliness
@@ -857,7 +926,9 @@ function ToiletDetail({ toilet, onClose, user }) {
               <button className={styles.submit} type="submit" disabled={submitting}>
                 {submitting ? 'Posting…' : 'Post review'}
               </button>
-            </form>
+                </form>
+              )}
+            </>
           ) : (
             <p className={styles.loginHint}>
               <Link to="/login">Login</Link> to leave a review — your fellow humans will thank you.
@@ -865,10 +936,10 @@ function ToiletDetail({ toilet, onClose, user }) {
           )}
 
           <div className={styles.reportArea}>
-            <button type="button" className={styles.reportBtn} onClick={() => setReportOpen((v) => !v)}>
+            <button type="button" className={styles.reportBtn} onClick={() => setShowReportForm((v) => !v)}>
               🚩 Report an issue
             </button>
-            {reportOpen && (
+            {showReportForm && (
               <>
                 {!user ? (
                   <p className={styles.reportLoginHint}>Please log in to report an issue</p>

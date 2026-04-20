@@ -80,6 +80,9 @@ function Navbar() {
         <span>NearestWC</span>
       </Link>
       <div className={styles.actions}>
+        <Link to="/advertise" className={styles.businessLink}>
+          For businesses
+        </Link>
         {sessionUser && points != null ? (
           <Link
             to="/profile"

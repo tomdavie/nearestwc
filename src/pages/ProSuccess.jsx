@@ -41,7 +41,7 @@ function ProSuccess() {
             is_pro: true,
             pro_expires_at: proExpiresAt,
           },
-          { onConflict: 'user_id' },
+          { onConflict: 'user_id', ignoreDuplicates: false },
         )
         .select('user_id, is_pro, pro_expires_at')
         .maybeSingle()
