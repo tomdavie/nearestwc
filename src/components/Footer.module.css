@@ -24,3 +24,8 @@
 .links a:hover {
   color: var(--color-primary);
 }
+
+.advertiseLink {
+  opacity: 0.82;
+  font-size: 12px;
+}

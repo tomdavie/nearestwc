@@ -89,9 +89,10 @@ function UrgentMode({ toilets, user, bypassProGate = false }) {
       ),
     [toilets],
   )
+  const canUseUrgent = Boolean(isPro || bypassProGate)
 
   const onUrgent = () => {
-    if (!isPro && !bypassProGate) {
+    if (!canUseUrgent) {
       showToast('Urgent Mode is a Pro feature', 'info')
       navigate('/upgrade')
       return
@@ -135,9 +136,11 @@ function UrgentMode({ toilets, user, bypassProGate = false }) {
   return (
     <>
       {overlay && <div className={styles.overlay}>{overlay}</div>}
-      <button type="button" className={styles.button} onClick={onUrgent} disabled={finding}>
-        {finding ? 'Finding nearest WC…' : '🚨 I need to go NOW'}
-      </button>
+      {canUseUrgent && (
+        <button type="button" className={styles.button} onClick={onUrgent} disabled={finding}>
+          {finding ? 'Finding nearest WC…' : '🚨 I need to go NOW'}
+        </button>
+      )}
     </>
   )
 }

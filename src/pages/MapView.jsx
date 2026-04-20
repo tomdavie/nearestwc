@@ -9,6 +9,12 @@ import styles from './MapView.module.css'
 const defaultCenter = { lat: 51.505, lng: -0.09 }
 const VIEWPORT_LIMIT = 3000
 
+function hasBowelCondition(conditionProfile) {
+  return ['Crohn\'s disease', 'Ulcerative Colitis', 'IBS', 'Other bowel condition'].includes(
+    conditionProfile || '',
+  )
+}
+
 function haversineMeters(aLat, aLng, bLat, bLng) {
   const toRad = (v) => (v * Math.PI) / 180
   const R = 6371000
@@ -107,6 +113,7 @@ function MapView() {
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [openNowOnly, setOpenNowOnly] = useState(false)
   const [ibdMode, setIbdMode] = useState(false)
+  const [hasBowelConditionProfile, setHasBowelConditionProfile] = useState(false)
   const [savingIbdMode, setSavingIbdMode] = useState(false)
   const [searching, setSearching] = useState(false)
   const [loadingToilets, setLoadingToilets] = useState(false)
@@ -269,13 +276,14 @@ function MapView() {
   useEffect(() => {
     if (!user?.id) {
       setIbdMode(false)
+      setHasBowelConditionProfile(false)
       return
     }
     let active = true
     ;(async () => {
       const { data, error } = await supabase
         .from('user_points')
-        .select('ibd_mode')
+        .select('ibd_mode, condition_profile')
         .eq('user_id', user.id)
         .maybeSingle()
       if (!active) return
@@ -284,6 +292,7 @@ function MapView() {
         return
       }
       setIbdMode(Boolean(data?.ibd_mode))
+      setHasBowelConditionProfile(hasBowelCondition(data?.condition_profile))
     })()
     return () => {
       active = false
@@ -547,20 +556,22 @@ function MapView() {
           <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06z" />
         </svg>
       </button>
-      <button
-        type="button"
-        className={`${styles.ibdQuickBtn} ${ibdMode ? styles.ibdQuickBtnActive : ''}`}
-        title={ibdMode ? 'Turn IBD mode off' : 'Turn IBD mode on'}
-        onClick={() => {
-          if (!user?.id) return
-          const next = !ibdMode
-          setIbdMode(next)
-          persistIbdMode(next)
-        }}
-        disabled={!user?.id || savingIbdMode}
-      >
-        🏥
-      </button>
+      {hasBowelConditionProfile && (
+        <button
+          type="button"
+          className={`${styles.ibdQuickBtn} ${ibdMode ? styles.ibdQuickBtnActive : ''}`}
+          title={ibdMode ? 'Turn IBD mode off' : 'Turn IBD mode on'}
+          onClick={() => {
+            if (!user?.id) return
+            const next = !ibdMode
+            setIbdMode(next)
+            persistIbdMode(next)
+          }}
+          disabled={!user?.id || savingIbdMode}
+        >
+          🏥
+        </button>
+      )}
 
       <div className={styles.floatingBar}>
         <form className={styles.searchCard} onSubmit={handleSearch}>
