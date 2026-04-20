@@ -5,6 +5,8 @@ import { useToast } from '../context/useToast'
 import { USER_POINTS_CHANGED_EVENT } from '../lib/pointsEvents'
 import styles from './UrgentMode.module.css'
 
+const URGENT_STRICT_RADIUS_METERS = 500
+
 function parseOpeningHours(raw) {
   if (!raw) return null
   if (typeof raw === 'object') return raw
@@ -82,11 +84,8 @@ function UrgentMode({ toilets, user, bypassProGate = false }) {
     return () => window.removeEventListener(USER_POINTS_CHANGED_EVENT, onPointsChanged)
   }, [fetchIsPro])
 
-  const candidates = useMemo(
-    () =>
-      (toilets || []).filter(
-        (t) => t.is_free && Number(t.average_rating) >= 4 && t.lat != null && t.lng != null && isOpenNow(t),
-      ),
+  const openCandidates = useMemo(
+    () => (toilets || []).filter((t) => t.lat != null && t.lng != null && isOpenNow(t)),
     [toilets],
   )
   const canUseUrgent = Boolean(isPro || bypassProGate)
@@ -105,15 +104,27 @@ function UrgentMode({ toilets, user, bypassProGate = false }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords
-        let best = null
-        for (const toilet of candidates) {
-          const d = haversineMeters(latitude, longitude, toilet.lat, toilet.lng)
-          if (!best || d < best.distance) best = { toilet, distance: d }
-        }
+        const ranked = openCandidates
+          .map((toilet) => ({
+            toilet,
+            distance: haversineMeters(latitude, longitude, toilet.lat, toilet.lng),
+          }))
+          .sort((a, b) => a.distance - b.distance)
+        const strictNearby = ranked.find(
+          ({ toilet, distance }) =>
+            toilet.is_free && Number(toilet.average_rating) >= 4 && distance <= URGENT_STRICT_RADIUS_METERS,
+        )
+        const best = strictNearby || ranked[0] || null
         setFinding(false)
         if (!best) {
-          showToast('No open, free, highly rated WC nearby right now.', 'info')
+          showToast('No open toilets nearby right now.', 'info')
           return
+        }
+        if (!strictNearby) {
+          showToast(
+            'Best available option nearby - no highly rated free toilets found within range',
+            'info',
+          )
         }
         const rounded = Math.round(best.distance)
         setOverlay(

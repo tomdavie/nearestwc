@@ -8,6 +8,8 @@ import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
 const VIEWPORT_LIMIT = 3000
+const IBD_STRICT_RADIUS_METERS = 500
+const IBD_STRICT_MIN_RESULTS = 3
 
 function hasBowelCondition(conditionProfile) {
   return ['Crohn\'s disease', 'Ulcerative Colitis', 'IBS', 'Other bowel condition'].includes(
@@ -334,7 +336,7 @@ function MapView() {
     [user?.id],
   )
 
-  const filtered = useMemo(() => {
+  const ibdFilteredResult = useMemo(() => {
     const now = new Date()
     const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()]
     const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
@@ -359,26 +361,59 @@ function MapView() {
       return currentTime >= daySlot.open && currentTime <= daySlot.close
     }
 
-    const filteredRows = toilets.filter((t) => {
+    const baseRows = toilets.filter((t) => {
       if (freeOnly && !t.is_free) return false
       if (accessibleOnly && !t.is_accessible) return false
       if (!isOpenNow(t)) return false
-      if (ibdMode) {
-        if (!t.is_free) return false
-        if (!t.is_accessible) return false
-        if (Number(t.average_rating) < 3) return false
-      }
       return true
     })
 
-    if (!ibdMode || !userLocation) return filteredRows
+    if (!ibdMode || !userLocation) {
+      return {
+        rows: baseRows,
+        mode: 'normal',
+      }
+    }
 
-    return [...filteredRows].sort((a, b) => {
-      const distanceA = haversineMeters(userLocation.lat, userLocation.lng, Number(a.lat), Number(a.lng))
-      const distanceB = haversineMeters(userLocation.lat, userLocation.lng, Number(b.lat), Number(b.lng))
-      return distanceA - distanceB
-    })
+    const ranked = [...baseRows]
+      .filter((t) => t.lat != null && t.lng != null)
+      .map((t) => ({
+        toilet: t,
+        distance: haversineMeters(userLocation.lat, userLocation.lng, Number(t.lat), Number(t.lng)),
+      }))
+      .sort((a, b) => a.distance - b.distance)
+
+    const strictNearby = ranked.filter(
+      ({ toilet, distance }) =>
+        toilet.is_free && Number(toilet.average_rating) >= 3 && distance <= IBD_STRICT_RADIUS_METERS,
+    )
+
+    if (strictNearby.length >= IBD_STRICT_MIN_RESULTS) {
+      return {
+        rows: strictNearby.map((entry) => entry.toilet),
+        mode: 'strict',
+      }
+    }
+
+    const freeNearby = ranked.filter(
+      ({ toilet, distance }) => toilet.is_free && distance <= IBD_STRICT_RADIUS_METERS,
+    )
+
+    if (freeNearby.length > 0) {
+      const allFreeSorted = ranked.filter(({ toilet }) => toilet.is_free)
+      return {
+        rows: allFreeSorted.map((entry) => entry.toilet),
+        mode: 'fallback',
+      }
+    }
+
+    return {
+      rows: ranked.map((entry) => entry.toilet),
+      mode: 'fallback',
+    }
   }, [toilets, freeOnly, accessibleOnly, openNowOnly, ibdMode, userLocation])
+  const filtered = ibdFilteredResult.rows
+  const isIbdFallbackActive = ibdMode && ibdFilteredResult.mode === 'fallback'
 
   const closestToiletId = useMemo(() => {
     if (!ibdMode || !filtered.length || !userLocation) return null
@@ -549,7 +584,13 @@ function MapView() {
 
       <UrgentMode toilets={toilets} user={user} bypassProGate={ibdMode} />
 
-      {ibdMode && <div className={styles.ibdBanner}>🏥 IBD Mode active - showing nearest clean, free toilets</div>}
+      {ibdMode && (
+        <div className={styles.ibdBanner}>
+          {isIbdFallbackActive
+            ? '🏥 IBD Mode - showing nearest available toilets'
+            : '🏥 IBD Mode active - showing nearest clean, free toilets'}
+        </div>
+      )}
 
       <button type="button" className={styles.locateBtn} onClick={locateMe} title="Locate me">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden>
