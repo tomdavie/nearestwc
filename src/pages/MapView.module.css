@@ -187,6 +187,51 @@
   box-shadow: var(--shadow-float);
 }
 
+.ibdQuickBtn {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 84px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(217, 48, 37, 0.25);
+  border-radius: var(--radius-full);
+  background: #fff;
+  color: #a50e0e;
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.ibdQuickBtnActive {
+  background: rgba(217, 48, 37, 0.11);
+}
+
+.ibdQuickBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ibdBanner {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: calc(var(--navbar-offset) + 126px);
+  z-index: 10;
+  padding: 8px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(217, 48, 37, 0.2);
+  background: rgba(217, 48, 37, 0.1);
+  color: #9f1d1d;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
 /* MarkerClustererPlus cluster div — disable any inherited pulse/animation */
 :global(.nwcMapCluster) {
   animation: none !important;

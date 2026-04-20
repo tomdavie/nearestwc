@@ -16,6 +16,12 @@ const LOCK_HINTS = {
   always_prepared: 'Confirm toilet roll available 10 times to unlock.',
 }
 
+function hasBowelCondition(conditionProfile) {
+  return ['Crohn\'s disease', 'Ulcerative Colitis', 'IBS', 'Other bowel condition'].includes(
+    conditionProfile || '',
+  )
+}
+
 function Profile() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
@@ -28,6 +34,7 @@ function Profile() {
   const [savedToilets, setSavedToilets] = useState([])
   const [conditionProfile, setConditionProfile] = useState('No specific condition')
   const [radarKey, setRadarKey] = useState(false)
+  const [ibdMode, setIbdMode] = useState(false)
   const [savingPrefs, setSavingPrefs] = useState(false)
 
   const loadProfile = useCallback(async (uid) => {
@@ -38,7 +45,7 @@ function Profile() {
       supabase
         .from('user_points')
         .select(
-          'points, level, badges, review_count, toilet_count, is_pro, pro_expires_at, saved_toilets, condition_profile, radar_key',
+          'points, level, badges, review_count, toilet_count, is_pro, pro_expires_at, saved_toilets, condition_profile, radar_key, ibd_mode',
         )
         .eq('user_id', uid)
         .maybeSingle(),
@@ -58,6 +65,7 @@ function Profile() {
     setPointsRow(pointsData)
     setConditionProfile(pointsData?.condition_profile || 'No specific condition')
     setRadarKey(Boolean(pointsData?.radar_key))
+    setIbdMode(Boolean(pointsData?.ibd_mode))
 
     const reviewFallbackCount = toiletsRes[0].count ?? 0
     const toiletFallbackCount = toiletsRes[1].count ?? 0
@@ -363,8 +371,10 @@ function Profile() {
           value={conditionProfile}
           onChange={(e) => {
             const value = e.target.value
+            const nextIbdMode = hasBowelCondition(value) ? true : ibdMode
             setConditionProfile(value)
-            persistPreferences({ condition_profile: value })
+            setIbdMode(nextIbdMode)
+            persistPreferences({ condition_profile: value, ibd_mode: nextIbdMode })
           }}
         >
           <option>No specific condition</option>
@@ -387,6 +397,22 @@ function Profile() {
           />
           <span>I use a RADAR key</span>
         </label>
+        <label className={styles.ibdRow}>
+          <span className={styles.ibdToggleText}>IBD Mode 🏥</span>
+          <input
+            type="checkbox"
+            checked={ibdMode}
+            onChange={(e) => {
+              const checked = e.target.checked
+              setIbdMode(checked)
+              persistPreferences({ ibd_mode: checked })
+            }}
+          />
+        </label>
+        <p className={styles.ibdHint}>
+          Optimises the map for urgent needs - sorts by distance, hides paid toilets, filters to clean and
+          accessible options.
+        </p>
         {savingPrefs && <p className={styles.muted}>Saving profile preferences…</p>}
       </div>
 

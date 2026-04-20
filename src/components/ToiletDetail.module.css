@@ -288,6 +288,17 @@
   color: var(--color-text);
 }
 
+.ibdBadge {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(24, 128, 56, 0.22);
+  background: rgba(24, 128, 56, 0.1);
+  color: #137333;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;

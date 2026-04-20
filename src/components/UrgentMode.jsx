@@ -41,7 +41,7 @@ function haversineMeters(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
 }
 
-function UrgentMode({ toilets, user }) {
+function UrgentMode({ toilets, user, bypassProGate = false }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [isPro, setIsPro] = useState(false)
@@ -91,7 +91,7 @@ function UrgentMode({ toilets, user }) {
   )
 
   const onUrgent = () => {
-    if (!isPro) {
+    if (!isPro && !bypassProGate) {
       showToast('Urgent Mode is a Pro feature', 'info')
       navigate('/upgrade')
       return

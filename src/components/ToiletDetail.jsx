@@ -101,6 +101,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   const [overallRating, setOverallRating] = useState(5)
   const [hasToiletRoll, setHasToiletRoll] = useState(true)
   const [hasSoap, setHasSoap] = useState(true)
+  const [ibdFriendly, setIbdFriendly] = useState(true)
   const [newComment, setNewComment] = useState('')
   const [reviewPhoto, setReviewPhoto] = useState(null)
   const [reviewPhotoPreview, setReviewPhotoPreview] = useState('')
@@ -166,7 +167,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     const { data, error } = await supabase
       .from('reviews')
       .select(
-        'id, user_id, helpful_count, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, comment, photo_url, created_at',
+        'id, user_id, helpful_count, rating, overall_rating, cleanliness, has_toilet_roll, has_soap, ibd_friendly, comment, photo_url, created_at',
       )
       .eq('toilet_id', toilet.id)
       .order('created_at', { ascending: false })
@@ -249,6 +250,13 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     const sum = reviews.reduce((acc, r) => acc + reviewOverallScore(r), 0)
     return Math.round((sum / reviews.length) * 10) / 10
   }, [reviews])
+  const ibdFriendlyShare = useMemo(() => {
+    const marked = reviews.filter((r) => typeof r.ibd_friendly === 'boolean')
+    if (!marked.length) return 0
+    const yesCount = marked.filter((r) => r.ibd_friendly).length
+    return yesCount / marked.length
+  }, [reviews])
+  const showIbdFriendlyBadge = ibdFriendlyShare > 0.5
 
   const tags = useMemo(() => {
     if (!toilet) return []
@@ -278,6 +286,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     setOverallRating(5)
     setHasToiletRoll(true)
     setHasSoap(true)
+    setIbdFriendly(true)
     setNewComment('')
   }
 
@@ -299,6 +308,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       cleanliness: cleanlinessRating,
       has_toilet_roll: hasToiletRoll,
       has_soap: hasSoap,
+      ibd_friendly: ibdFriendly,
       overall_rating: overallRating,
       comment: newComment.trim() || null,
       rating: overallRating,
@@ -627,6 +637,9 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
           <h2 id="toilet-detail-title" className={styles.title}>
             {toilet.name || 'Unnamed toilet'}
           </h2>
+          {showIbdFriendlyBadge && (
+            <p className={styles.ibdBadge}>✅ IBD Friendly - rated by the community</p>
+          )}
           <button type="button" className={styles.shareBtn} onClick={handleShare}>
             🔗 Share this WC
           </button>
@@ -761,13 +774,18 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                   <div className={styles.reviewMeta}>
                     <StarRow value={reviewOverallScore(r)} size="sm" />
                   </div>
-                  {(r.has_toilet_roll != null || r.has_soap != null) && (
+                  {(r.has_toilet_roll != null || r.has_soap != null || r.ibd_friendly != null) && (
                     <p className={styles.reviewFacilities}>
                       {r.has_toilet_roll != null && (
                         <span className={styles.facilityChip}>Roll: {r.has_toilet_roll ? 'Yes' : 'No'}</span>
                       )}
                       {r.has_soap != null && (
                         <span className={styles.facilityChip}>Soap: {r.has_soap ? 'Yes' : 'No'}</span>
+                      )}
+                      {r.ibd_friendly != null && (
+                        <span className={styles.facilityChip}>
+                          IBD friendly: {r.ibd_friendly ? 'Yes' : 'No'}
+                        </span>
                       )}
                     </p>
                   )}
@@ -895,6 +913,30 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                     className={`${styles.segBtn} ${!hasSoap ? styles.segBtnActive : ''}`}
                     onClick={() => setHasSoap(false)}
                     aria-pressed={!hasSoap}
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className={styles.fieldLabel} id="ibd-friendly-label">
+                  IBD Friendly?
+                </p>
+                <div className={styles.seg} role="group" aria-labelledby="ibd-friendly-label">
+                  <button
+                    type="button"
+                    className={`${styles.segBtn} ${ibdFriendly ? styles.segBtnActive : ''}`}
+                    onClick={() => setIbdFriendly(true)}
+                    aria-pressed={ibdFriendly}
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.segBtn} ${!ibdFriendly ? styles.segBtnActive : ''}`}
+                    onClick={() => setIbdFriendly(false)}
+                    aria-pressed={!ibdFriendly}
                   >
                     No
                   </button>

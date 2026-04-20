@@ -283,6 +283,32 @@
   color: var(--color-text);
 }
 
+.ibdRow {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(217, 48, 37, 0.24);
+  background: rgba(217, 48, 37, 0.07);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #9f1d1d;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ibdToggleText {
+  font-weight: 700;
+}
+
+.ibdHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8b2b2b;
+}
+
 .loading {
   padding: 40px 0;
   text-align: center;

@@ -9,6 +9,19 @@ import styles from './MapView.module.css'
 const defaultCenter = { lat: 51.505, lng: -0.09 }
 const VIEWPORT_LIMIT = 3000
 
+function haversineMeters(aLat, aLng, bLat, bLng) {
+  const toRad = (v) => (v * Math.PI) / 180
+  const R = 6371000
+  const dLat = toRad(bLat - aLat)
+  const dLng = toRad(bLng - aLng)
+  const lat1 = toRad(aLat)
+  const lat2 = toRad(bLat)
+  const x =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2)
+  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
+}
+
 function getMarkerIcon(avgRating) {
   const color =
     avgRating >= 4 ? '#22c55e' : avgRating >= 3 ? '#f59e0b' : avgRating > 0 ? '#ef4444' : '#9ca3af'
@@ -36,6 +49,25 @@ function getSponsoredMarkerIcon() {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
     scaledSize: new window.google.maps.Size(36, 48),
     anchor: new window.google.maps.Point(18, 48)
+  }
+}
+
+function getIbdHighlightedIcon(isSponsored) {
+  const fill = isSponsored ? '#F59E0B' : '#d93025'
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="23" fill="${fill}" stroke="white" stroke-width="2.5" />
+      <circle cx="26" cy="26" r="24.5" fill="none" stroke="#d93025" stroke-width="2.5" opacity="0.95">
+        <animate attributeName="r" values="23;25.5;23" dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.95;0.3;0.95" dur="1.2s" repeatCount="indefinite" />
+      </circle>
+      <text x="26" y="31" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="Arial, sans-serif">WC</text>
+    </svg>
+  `
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(52, 52),
+    anchor: new window.google.maps.Point(26, 26),
   }
 }
 /** Single solid blue disk for MarkerClustererPlus — text is drawn by the clusterer, not baked into the image. */
@@ -74,6 +106,8 @@ function MapView() {
   const [freeOnly, setFreeOnly] = useState(false)
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [openNowOnly, setOpenNowOnly] = useState(false)
+  const [ibdMode, setIbdMode] = useState(false)
+  const [savingIbdMode, setSavingIbdMode] = useState(false)
   const [searching, setSearching] = useState(false)
   const [loadingToilets, setLoadingToilets] = useState(false)
   const refreshTimerRef = useRef(null)
@@ -232,6 +266,65 @@ function MapView() {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!user?.id) {
+      setIbdMode(false)
+      return
+    }
+    let active = true
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('user_points')
+        .select('ibd_mode')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!active) return
+      if (error) {
+        console.error('[MapView] ibd_mode fetch error', error)
+        return
+      }
+      setIbdMode(Boolean(data?.ibd_mode))
+    })()
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  const persistIbdMode = useCallback(
+    async (nextValue) => {
+      if (!user?.id) return
+      setSavingIbdMode(true)
+      const { data: existing, error: existingError } = await supabase
+        .from('user_points')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (existingError) {
+        console.error('[MapView] ibd_mode lookup error', existingError)
+        setSavingIbdMode(false)
+        return
+      }
+      if (existing) {
+        const { error } = await supabase
+          .from('user_points')
+          .update({ ibd_mode: nextValue })
+          .eq('user_id', user.id)
+        if (error) console.error('[MapView] ibd_mode update error', error)
+      } else {
+        const { error } = await supabase.from('user_points').insert({
+          user_id: user.id,
+          points: 0,
+          level: 'desperate_dan',
+          badges: [],
+          ibd_mode: nextValue,
+        })
+        if (error) console.error('[MapView] ibd_mode insert error', error)
+      }
+      setSavingIbdMode(false)
+    },
+    [user?.id],
+  )
+
   const filtered = useMemo(() => {
     const now = new Date()
     const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()]
@@ -257,13 +350,31 @@ function MapView() {
       return currentTime >= daySlot.open && currentTime <= daySlot.close
     }
 
-    return toilets.filter((t) => {
+    const filteredRows = toilets.filter((t) => {
       if (freeOnly && !t.is_free) return false
       if (accessibleOnly && !t.is_accessible) return false
       if (!isOpenNow(t)) return false
+      if (ibdMode) {
+        if (!t.is_free) return false
+        if (!t.is_accessible) return false
+        if (Number(t.average_rating) < 3) return false
+      }
       return true
     })
-  }, [toilets, freeOnly, accessibleOnly, openNowOnly])
+
+    if (!ibdMode || !userLocation) return filteredRows
+
+    return [...filteredRows].sort((a, b) => {
+      const distanceA = haversineMeters(userLocation.lat, userLocation.lng, Number(a.lat), Number(a.lng))
+      const distanceB = haversineMeters(userLocation.lat, userLocation.lng, Number(b.lat), Number(b.lng))
+      return distanceA - distanceB
+    })
+  }, [toilets, freeOnly, accessibleOnly, openNowOnly, ibdMode, userLocation])
+
+  const closestToiletId = useMemo(() => {
+    if (!ibdMode || !filtered.length || !userLocation) return null
+    return filtered[0]?.id ?? null
+  }, [filtered, ibdMode, userLocation])
 
   const isToiletSponsored = useCallback(
     (toilet) => sponsoredListings.some((s) => s.toilet_id === toilet.id),
@@ -391,6 +502,7 @@ function MapView() {
                 const sponsoredListing =
                   sponsoredListings?.find((s) => s?.toilet_id === toilet?.id) ?? null
                 const isSponsored = isToiletSponsored(toilet)
+                const isClosestIbd = Boolean(ibdMode && closestToiletId && toilet.id === closestToiletId)
                 console.log('rendering marker for toilet:', toilet.id, 'is sponsored:', isSponsored)
                 return (
                   <Marker
@@ -399,7 +511,13 @@ function MapView() {
                     position={{ lat: toilet.lat, lng: toilet.lng }}
                     onClick={() => handleMarkerClick(toilet, sponsoredListing)}
                     options={{ optimized: false }}
-                    icon={isSponsored ? getSponsoredMarkerIcon() : getMarkerIcon(toilet.average_rating)}
+                    icon={
+                      isClosestIbd
+                        ? getIbdHighlightedIcon(isSponsored)
+                        : isSponsored
+                          ? getSponsoredMarkerIcon()
+                          : getMarkerIcon(toilet.average_rating)
+                    }
                   />
                 )
               })()
@@ -420,12 +538,28 @@ function MapView() {
         />
       )}
 
-      <UrgentMode toilets={toilets} user={user} />
+      <UrgentMode toilets={toilets} user={user} bypassProGate={ibdMode} />
+
+      {ibdMode && <div className={styles.ibdBanner}>🏥 IBD Mode active - showing nearest clean, free toilets</div>}
 
       <button type="button" className={styles.locateBtn} onClick={locateMe} title="Locate me">
         <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden>
           <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06z" />
         </svg>
+      </button>
+      <button
+        type="button"
+        className={`${styles.ibdQuickBtn} ${ibdMode ? styles.ibdQuickBtnActive : ''}`}
+        title={ibdMode ? 'Turn IBD mode off' : 'Turn IBD mode on'}
+        onClick={() => {
+          if (!user?.id) return
+          const next = !ibdMode
+          setIbdMode(next)
+          persistIbdMode(next)
+        }}
+        disabled={!user?.id || savingIbdMode}
+      >
+        🏥
       </button>
 
       <div className={styles.floatingBar}>
