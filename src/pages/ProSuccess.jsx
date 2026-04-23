@@ -16,13 +16,11 @@ function ProSuccess() {
     let pollInterval = null
 
     const startPollingForPro = (userId) => {
-      let attempts = 0
-      const maxAttempts = 15 // 30 seconds at 2s interval
+      const startedAt = Date.now()
       setStatus('checking')
       setLine('Payment successful — waiting for webhook confirmation…')
 
       const check = async () => {
-        attempts += 1
         const { data, error } = await supabase
           .from('user_points')
           .select('is_pro')
@@ -44,12 +42,10 @@ function ProSuccess() {
           return
         }
 
-        if (attempts >= maxAttempts) {
+        if (Date.now() - startedAt >= 30000) {
           if (pollInterval) window.clearInterval(pollInterval)
           setStatus('delayed')
-          setLine(
-            'Taking longer than expected - your Pro access will activate shortly. Check your profile in a few minutes.',
-          )
+          setLine('Taking longer than expected - check your profile in a few minutes')
           return
         }
       }
@@ -96,7 +92,7 @@ function ProSuccess() {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
-          <p className={styles.loadingText}>Activating your Pro account…</p>
+          <p className={styles.loadingText}>Activating your Pro account... 🚽</p>
           <p className={styles.statusLine}>{line}</p>
         </div>
       </div>
@@ -128,7 +124,7 @@ function ProSuccess() {
       <div className={styles.page}>
         <div className={styles.card}>
           <h1 className={styles.title}>Almost there</h1>
-          <p className={styles.sub}>{line}</p>
+          <p className={styles.sub}>Taking longer than expected - check your profile in a few minutes</p>
           <p className={styles.meta}>
             You can continue using the app now — this page will update automatically next time you visit.
           </p>
@@ -141,7 +137,7 @@ function ProSuccess() {
     <div className={styles.page}>
       <div className={styles.card}>
         <p className={styles.statusLine}>{line}</p>
-        <h1 className={styles.title}>You&apos;re now a NearestWC Pro. 🚽👑</h1>
+        <h1 className={styles.title}>You&apos;re now a NearestWC Pro 👑</h1>
         <p className={styles.sub}>Your bowels will thank you.</p>
         <ul className={styles.list}>
           <li>Urgent Mode for immediate directions to the best nearby option.</li>
