@@ -10,6 +10,7 @@ import {
 } from '../lib/userPoints'
 import { uploadReviewPhoto } from '../lib/storageUploads'
 import { getLevelFromPoints } from '../utils/points'
+import { track } from '../utils/analytics'
 import styles from './ToiletDetail.module.css'
 
 const REPORT_REASONS = [
@@ -320,6 +321,10 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       showToast(error.message, 'error')
       return
     }
+    track('review_submitted', {
+      toilet_id: toilet.id,
+      overall_rating: overallRating,
+    })
     let gamification = { newBadges: [] }
     try {
       gamification = await incrementUserPoints(user.id, 10)
@@ -534,6 +539,10 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     setShowReportForm(false)
     setReportDetails('')
     setReportReason('Permanently closed')
+    track('report_submitted', {
+      toilet_id: toilet.id,
+      reason: reportReason,
+    })
     showToast('Thanks for the heads up 🔍', 'success')
   }
 

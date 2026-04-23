@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
 import { startProCheckout } from '../utils/stripe'
+import { track } from '../utils/analytics'
 import BackButton from '../components/BackButton'
 import styles from './Upgrade.module.css'
 
@@ -19,7 +20,12 @@ function Upgrade() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    track('upgrade_page_viewed')
+  }, [])
+
   const goPro = async () => {
+    track('pro_checkout_started')
     setLoading(true)
     const { data } = await supabase.auth.getUser()
     const user = data.user

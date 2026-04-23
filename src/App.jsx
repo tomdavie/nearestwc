@@ -1,18 +1,5 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
-import MapView from './pages/MapView'
-import AddToilet from './pages/AddToilet'
-import Login from './pages/Login'
-import Profile from './pages/Profile'
-import ToiletPage from './pages/ToiletPage'
-import Admin from './pages/Admin'
-import Upgrade from './pages/Upgrade'
-import ProSuccess from './pages/ProSuccess'
-import SafeRoute from './pages/SafeRoute'
-import SponsoredListingInfo from './pages/SponsoredListingInfo'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import Terms from './pages/Terms'
-import NotFound from './pages/NotFound'
 import Navbar from './components/Navbar'
 import Onboarding from './components/Onboarding'
 import Footer from './components/Footer'
@@ -20,6 +7,20 @@ import { ToastProvider } from './context/ToastProvider'
 import { supabase } from './supabaseClient'
 import styles from './App.module.css'
 import './App.css'
+
+const MapView = lazy(() => import('./pages/MapView'))
+const AddToilet = lazy(() => import('./pages/AddToilet'))
+const Login = lazy(() => import('./pages/Login'))
+const Profile = lazy(() => import('./pages/Profile'))
+const ToiletPage = lazy(() => import('./pages/ToiletPage'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Upgrade = lazy(() => import('./pages/Upgrade'))
+const ProSuccess = lazy(() => import('./pages/ProSuccess'))
+const SafeRoute = lazy(() => import('./pages/SafeRoute'))
+const SponsoredListingInfo = lazy(() => import('./pages/SponsoredListingInfo'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const Terms = lazy(() => import('./pages/Terms'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 function AppShell() {
   const { pathname } = useLocation()
@@ -30,21 +31,39 @@ function AppShell() {
     <div className={isMap ? styles.shellMap : styles.shell}>
       <Navbar />
       <main className={isMap ? styles.mainMap : styles.main}>
-        <Routes>
-          <Route path="/" element={<MapView />} />
-          <Route path="/add" element={<AddToilet />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/upgrade" element={<Upgrade />} />
-          <Route path="/pro-success" element={<ProSuccess />} />
-          <Route path="/safe-route" element={<SafeRoute />} />
-          <Route path="/advertise" element={<SponsoredListingInfo />} />
-          <Route path="/wc/:id" element={<ToiletPage />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100vh',
+                backgroundColor: '#1a73e8',
+                color: 'white',
+                fontSize: '18px',
+              }}
+            >
+              Loading...
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<MapView />} />
+            <Route path="/add" element={<AddToilet />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/upgrade" element={<Upgrade />} />
+            <Route path="/pro-success" element={<ProSuccess />} />
+            <Route path="/safe-route" element={<SafeRoute />} />
+            <Route path="/advertise" element={<SponsoredListingInfo />} />
+            <Route path="/wc/:id" element={<ToiletPage />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
       {showFooter && <Footer />}
       <Onboarding />

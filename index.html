@@ -24,8 +24,67 @@
     />
     <meta property="og:image" content="/icon-512.png" />
     <title>NearestWC - Find a toilet near you</title>
+    <style>
+      #nwc-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #1a73e8;
+        display: grid;
+        place-items: center;
+        opacity: 0;
+        animation: nwcSplashFadeIn 0.35s ease forwards;
+        transition: opacity 0.28s ease;
+      }
+
+      #nwc-splash.nwc-hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #nwc-splash .nwc-splash-inner {
+        text-align: center;
+        color: #fff;
+      }
+
+      #nwc-splash .nwc-splash-mark {
+        width: 74px;
+        height: 74px;
+        margin: 0 auto 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        display: grid;
+        place-items: center;
+        font-size: 38px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      #nwc-splash .nwc-splash-text {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      @keyframes nwcSplashFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="nwc-splash" aria-hidden="true">
+      <div class="nwc-splash-inner">
+        <div class="nwc-splash-mark">W</div>
+        <p class="nwc-splash-text">NearestWC</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

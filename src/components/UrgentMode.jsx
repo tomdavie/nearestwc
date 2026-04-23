@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../context/useToast'
 import { USER_POINTS_CHANGED_EVENT } from '../lib/pointsEvents'
+import { track } from '../utils/analytics'
 import styles from './UrgentMode.module.css'
 
 const URGENT_STRICT_RADIUS_METERS = 500
@@ -43,7 +44,7 @@ function haversineMeters(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
 }
 
-function UrgentMode({ toilets, user, bypassProGate = false }) {
+function UrgentMode({ toilets, user }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const [isPro, setIsPro] = useState(false)
@@ -88,11 +89,15 @@ function UrgentMode({ toilets, user, bypassProGate = false }) {
     () => (toilets || []).filter((t) => t.lat != null && t.lng != null && isOpenNow(t)),
     [toilets],
   )
-  const canUseUrgent = Boolean(isPro || bypassProGate)
+  const canUseUrgent = Boolean(isPro)
 
   const onUrgent = () => {
+    track('urgent_mode_tapped')
     if (!canUseUrgent) {
-      showToast('Urgent Mode is a Pro feature', 'info')
+      showToast(
+        "Urgent Mode is built for people who can't wait. Get instant directions to the nearest available toilet for £1.99/month.",
+        'info',
+      )
       navigate('/upgrade')
       return
     }

@@ -24,3 +24,14 @@ npx cap open ios
 - Build and run
 
 For Android, use `npx cap open android` and build from Android Studio.
+
+## Stripe Webhook Setup (Pro activation)
+
+1. In Stripe Dashboard, go to **Developers → Webhooks**.
+2. Add endpoint:
+   - `https://nearestwc.vercel.app/api/stripe-webhook`
+3. Select these events:
+   - `checkout.session.completed`
+   - `customer.subscription.deleted`
+4. Copy the signing secret and set it in Vercel env vars as:
+   - `STRIPE_WEBHOOK_SECRET`

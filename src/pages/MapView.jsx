@@ -4,6 +4,7 @@ import { GoogleMap, useJsApiLoader, Marker, MarkerClustererF } from '@react-goog
 import { supabase } from '../supabaseClient'
 import ToiletDetail from '../components/ToiletDetail'
 import UrgentMode from '../components/UrgentMode'
+import { track } from '../utils/analytics'
 import styles from './MapView.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
@@ -121,6 +122,7 @@ function MapView() {
   const [loadingToilets, setLoadingToilets] = useState(false)
   const refreshTimerRef = useRef(null)
   const requestSeqRef = useRef(0)
+  const mapLoadedTrackedRef = useRef(false)
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
@@ -439,6 +441,10 @@ function MapView() {
           isSponsored: Boolean(matchedListing),
           sponsoredListing: matchedListing,
         })
+        track('toilet_pin_tapped', {
+          toilet_id: toilet.id,
+          is_sponsored: Boolean(matchedListing),
+        })
       } catch (error) {
         console.error('[MapView] marker click handler failed', error, toilet)
       }
@@ -495,6 +501,7 @@ function MapView() {
     e.preventDefault()
     const q = searchText.trim()
     if (!q || !window.google?.maps?.Geocoder) return
+    track('search_used', { query_length: q.length })
     setSearching(true)
     const geocoder = new window.google.maps.Geocoder()
     geocoder.geocode({ address: q }, (results, status) => {
@@ -525,7 +532,13 @@ function MapView() {
         mapContainerClassName={styles.map}
         center={userLocation || defaultCenter}
         zoom={15}
-        onLoad={(instance) => setMap(instance)}
+        onLoad={(instance) => {
+          setMap(instance)
+          if (!mapLoadedTrackedRef.current) {
+            track('map_loaded')
+            mapLoadedTrackedRef.current = true
+          }
+        }}
         onIdle={scheduleViewportRefresh}
         options={{
           fullscreenControl: false,
@@ -582,7 +595,7 @@ function MapView() {
         />
       )}
 
-      <UrgentMode toilets={toilets} user={user} bypassProGate={ibdMode} />
+      <UrgentMode toilets={toilets} user={user} />
 
       {ibdMode && (
         <div className={styles.ibdBanner}>
@@ -607,6 +620,7 @@ function MapView() {
             const next = !ibdMode
             setIbdMode(next)
             persistIbdMode(next)
+            track('ibd_mode_toggled', { ibd_mode: next })
           }}
           disabled={!user?.id || savingIbdMode}
         >

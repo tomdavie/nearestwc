@@ -1,101 +1,90 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
-import { useToast } from '../context/useToast'
 import { notifyUserPointsChanged } from '../lib/pointsEvents'
 import styles from './ProSuccess.module.css'
 
 function ProSuccess() {
   const navigate = useNavigate()
-  const { showToast } = useToast()
   const [status, setStatus] = useState('loading')
-  const [line, setLine] = useState('Waiting for your session…')
-  const activatedRef = useRef(false)
+  const [line, setLine] = useState('Confirming your session…')
+  const successHandledRef = useRef(false)
 
   useEffect(() => {
-    let mounted = true
-    let timeoutId = null
+    let active = true
+    let noSessionTimeout = null
+    let pollInterval = null
 
-    const thirtyDaysFromNow = () => {
-      const d = new Date()
-      d.setDate(d.getDate() + 30)
-      return d.toISOString()
-    }
+    const startPollingForPro = (userId) => {
+      let attempts = 0
+      const maxAttempts = 15 // 30 seconds at 2s interval
+      setStatus('checking')
+      setLine('Payment successful — waiting for webhook confirmation…')
 
-    const activatePro = async (user) => {
-      if (!user?.id || activatedRef.current) return
-      activatedRef.current = true
-      if (timeoutId != null) window.clearTimeout(timeoutId)
-      if (mounted) {
-        setLine('Session confirmed — activating your Pro account…')
-        setStatus('activating')
+      const check = async () => {
+        attempts += 1
+        const { data, error } = await supabase
+          .from('user_points')
+          .select('is_pro')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (!active) return
+        if (error) {
+          console.error('[ProSuccess] polling error', error)
+        }
+
+        if (Boolean(data?.is_pro)) {
+          if (pollInterval) window.clearInterval(pollInterval)
+          if (!successHandledRef.current) {
+            successHandledRef.current = true
+            notifyUserPointsChanged()
+          }
+          setStatus('success')
+          setLine('Pro activated — welcome to NearestWC Pro!')
+          return
+        }
+
+        if (attempts >= maxAttempts) {
+          if (pollInterval) window.clearInterval(pollInterval)
+          setStatus('delayed')
+          setLine(
+            'Taking longer than expected - your Pro access will activate shortly. Check your profile in a few minutes.',
+          )
+          return
+        }
       }
 
-      const proExpiresAt = thirtyDaysFromNow()
+      check()
+      pollInterval = window.setInterval(check, 2000)
+    }
 
-      const { data, error } = await supabase
-        .from('user_points')
-        .upsert(
-          {
-            user_id: user.id,
-            is_pro: true,
-            pro_expires_at: proExpiresAt,
-          },
-          { onConflict: 'user_id', ignoreDuplicates: false },
-        )
-        .select('user_id, is_pro, pro_expires_at')
-        .maybeSingle()
-
-      if (!mounted) return
-
-      if (error) {
-        console.error('[ProSuccess] upsert failed', error)
-        activatedRef.current = false
-        setLine(`Could not save Pro status: ${error.message}`)
-        setStatus('error')
-        showToast(error.message || 'Could not activate Pro.', 'error')
+    const resolveSessionAndPoll = async () => {
+      const { data } = await supabase.auth.getSession()
+      const userId = data?.session?.user?.id
+      if (!active) return
+      if (!userId) {
+        setStatus('no_session')
+        setLine('No login session detected yet.')
         return
       }
-
-      console.log('[ProSuccess] upsert ok', data)
-      if (mounted) setLine('Pro saved — you’re all set!')
-      notifyUserPointsChanged()
-      if (mounted) setStatus('success')
+      if (noSessionTimeout) window.clearTimeout(noSessionTimeout)
+      startPollingForPro(userId)
     }
 
-    const trySession = async (session, source) => {
-      if (!mounted || activatedRef.current) return
-      if (session?.user) {
-        if (timeoutId != null) window.clearTimeout(timeoutId)
-        if (mounted) setLine(`Session ready (${source}) — activating…`)
-        await activatePro(session.user)
-      }
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      trySession(session, 'getSession')
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
-      if (mounted) setLine(`Auth: ${event} — checking session…`)
-      await trySession(session, `onAuthStateChange:${event}`)
-    })
-
-    timeoutId = window.setTimeout(() => {
-      if (!mounted || activatedRef.current) return
+    noSessionTimeout = window.setTimeout(() => {
+      if (!active || successHandledRef.current) return
       setStatus('no_session')
       setLine('No login session detected yet.')
     }, 5000)
 
+    resolveSessionAndPoll()
+
     return () => {
-      mounted = false
-      subscription.unsubscribe()
-      if (timeoutId != null) window.clearTimeout(timeoutId)
+      active = false
+      if (noSessionTimeout) window.clearTimeout(noSessionTimeout)
+      if (pollInterval) window.clearInterval(pollInterval)
     }
-  }, [showToast])
+  }, [])
 
   useEffect(() => {
     if (status !== 'success') return undefined
@@ -103,7 +92,7 @@ function ProSuccess() {
     return () => window.clearTimeout(timer)
   }, [status, navigate])
 
-  if (status === 'loading' || status === 'activating') {
+  if (status === 'loading' || status === 'checking') {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
@@ -134,16 +123,14 @@ function ProSuccess() {
     )
   }
 
-  if (status === 'error') {
+  if (status === 'delayed') {
     return (
       <div className={styles.page}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Couldn&apos;t activate Pro yet</h1>
+          <h1 className={styles.title}>Almost there</h1>
           <p className={styles.sub}>{line}</p>
           <p className={styles.meta}>
-            <button type="button" className={styles.retryBtn} onClick={() => navigate('/profile')}>
-              Back to profile
-            </button>
+            You can continue using the app now — this page will update automatically next time you visit.
           </p>
         </div>
       </div>

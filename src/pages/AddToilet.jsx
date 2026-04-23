@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
 import { useToast } from '../context/useToast'
 import BackButton from '../components/BackButton'
+import { track } from '../utils/analytics'
 import styles from './AddToilet.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
@@ -157,30 +158,36 @@ function AddToilet() {
     }
 
     setSubmitting(true)
-    const { error } = await supabase.from('toilets').insert([
-      {
-        name,
-        lat: position.lat,
-        lng: position.lng,
-        added_by: user.id,
-        is_free: isFree,
-        cost: isFree ? null : cost.trim() || null,
-        accepts_cash: isFree ? false : accepts_cash,
-        accepts_card: isFree ? false : accepts_card,
-        is_accessible: isAccessible,
-        requires_key,
-        radar_key_accepted,
-        baby_changing: babyChanging,
-        opening_hours: JSON.stringify(openingHoursPayload),
-        access_code,
-        description: description.trim() || null,
-        photo_url: toiletPhotoUrl,
-      },
-    ])
+    const { data: insertedToilets, error } = await supabase
+      .from('toilets')
+      .insert([
+        {
+          name,
+          lat: position.lat,
+          lng: position.lng,
+          added_by: user.id,
+          is_free: isFree,
+          cost: isFree ? null : cost.trim() || null,
+          accepts_cash: isFree ? false : accepts_cash,
+          accepts_card: isFree ? false : accepts_card,
+          is_accessible: isAccessible,
+          requires_key,
+          radar_key_accepted,
+          baby_changing: babyChanging,
+          opening_hours: JSON.stringify(openingHoursPayload),
+          access_code,
+          description: description.trim() || null,
+          photo_url: toiletPhotoUrl,
+        },
+      ])
+      .select('id')
     setSubmitting(false)
     if (error) {
       showToast(error.message, 'error')
     } else {
+      track('toilet_added', {
+        toilet_id: insertedToilets?.[0]?.id || null,
+      })
       let gamification = { newBadges: [] }
       try {
         gamification = await incrementUserPoints(user.id, 20)
