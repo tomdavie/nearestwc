@@ -20,16 +20,19 @@ const SafeRoute = lazy(() => import('./pages/SafeRoute'))
 const SponsoredListingInfo = lazy(() => import('./pages/SponsoredListingInfo'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const Terms = lazy(() => import('./pages/Terms'))
+const Landing = lazy(() => import('./pages/Landing'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
-function AppShell() {
+function AppShell({ isLoggedIn }) {
   const { pathname } = useLocation()
-  const isMap = pathname === '/'
-  const showFooter = pathname === '/privacy' || pathname === '/terms' || pathname === '/advertise'
+  const isMap = pathname === '/' && isLoggedIn
+  const isLandingPage = pathname === '/landing' || (pathname === '/' && !isLoggedIn)
+  const showFooter =
+    !isLandingPage && (pathname === '/privacy' || pathname === '/terms' || pathname === '/advertise')
 
   return (
     <div className={isMap ? styles.shellMap : styles.shell}>
-      <Navbar />
+      {!isLandingPage && <Navbar />}
       <main className={isMap ? styles.mainMap : styles.main}>
         <Suspense
           fallback={
@@ -49,7 +52,8 @@ function AppShell() {
           }
         >
           <Routes>
-            <Route path="/" element={<MapView />} />
+            <Route path="/" element={isLoggedIn ? <MapView /> : <Landing />} />
+            <Route path="/landing" element={<Landing />} />
             <Route path="/add" element={<AddToilet />} />
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
@@ -66,23 +70,32 @@ function AppShell() {
         </Suspense>
       </main>
       {showFooter && <Footer />}
-      <Onboarding />
+      {!isLandingPage && <Onboarding />}
     </div>
   )
 }
 
 function App() {
   const [authReady, setAuthReady] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
     let mounted = true
-    supabase.auth.getSession().finally(() => {
-      if (mounted) setAuthReady(true)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (mounted) setIsLoggedIn(Boolean(data?.session?.user))
+      })
+      .finally(() => {
+        if (mounted) setAuthReady(true)
+      })
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      if (mounted) setAuthReady(true)
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) {
+        setIsLoggedIn(Boolean(session?.user))
+        setAuthReady(true)
+      }
     })
 
     return () => {
@@ -141,7 +154,7 @@ function App() {
 
   return (
     <ToastProvider>
-      <AppShell />
+      <AppShell isLoggedIn={isLoggedIn} />
     </ToastProvider>
   )
 }
