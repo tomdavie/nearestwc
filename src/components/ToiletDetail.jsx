@@ -1160,13 +1160,13 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
 
           <p className={styles.sectionLabel}>Access and hours</p>
           <div className={styles.metaPills}>
-            {toilet.is_free ? (
-              <span className={`${styles.pill} ${styles.pillFree}`}>Free 🆓</span>
-            ) : (
-              <>
-                <span className={`${styles.pill} ${styles.pillPaid}`}>
-                  {toilet.cost ? `Paid ${toilet.cost}` : 'Paid'}
-                </span>
+          {toilet.is_free ? (
+  <span className={`${styles.pill} ${styles.pillFree}`}>✅ Free</span>
+) : (
+  <>
+    <span className={`${styles.pill} ${styles.pillPaid}`}>
+      {toilet.cost ? `💰 ${toilet.cost}` : '💰 Paid'}
+    </span>
                 {toilet.accepts_cash && <span className={styles.pill}>Cash</span>}
                 {toilet.accepts_card && <span className={styles.pill}>Card</span>}
               </>
