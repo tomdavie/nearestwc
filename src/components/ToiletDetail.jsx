@@ -612,7 +612,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       .update({ helpful_count: next })
       .eq('id', reviewId)
       .select()
-      .single()
+      .maybeSingle()
     if (e2) {
       showToast(e2.message, 'error')
       setHelpfulLoadingId(null)
@@ -670,7 +670,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       .update({ saves_count: next })
       .eq('id', toilet.id)
       .select()
-      .single()
+      .maybeSingle()
     setSavingToilet(false)
     if (error) {
       showToast(error.message, 'error')
@@ -717,7 +717,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       .update(payload)
       .eq('id', reviewId)
       .select()
-      .single()
+      .maybeSingle()
     setSavingReviewEdit(false)
     if (error) {
       showToast(error.message, 'error')
@@ -740,7 +740,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       .update(patch)
       .eq('id', toilet.id)
       .select()
-      .single()
+      .maybeSingle()
     if (!error) {
       Object.assign(toilet, data || patch)
       try {
@@ -778,7 +778,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
         .update({ is_closed: true })
         .eq('id', toilet.id)
         .select()
-        .single()
+        .maybeSingle()
     }
     if (confirmed >= 3 && pendingReport.reason !== 'Permanently closed') {
       reportPatch.pending_review = false
@@ -869,7 +869,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       .update({ opening_hours: JSON.stringify(nextOpeningHours) })
       .eq('id', toilet.id)
       .select()
-      .single()
+      .maybeSingle()
     console.log('[ToiletDetail] opening_hours update response', { data, error })
     setSavingHours(false)
     if (error) {
