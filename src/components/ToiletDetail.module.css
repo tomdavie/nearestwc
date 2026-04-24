@@ -288,6 +288,28 @@
   color: var(--color-text);
 }
 
+.addressBtn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: left;
+  padding: 0;
+  margin: -8px 0 10px;
+  cursor: pointer;
+}
+
+.addressBtn:hover {
+  text-decoration: underline;
+}
+
+.topActionsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .ibdBadge {
   margin: -4px 0 12px;
   padding: 8px 10px;
@@ -410,8 +432,10 @@
   font-weight: 600;
   background: #fff;
   color: var(--color-text-secondary);
-  margin-bottom: 12px;
+  margin-bottom: 0;
   cursor: pointer;
+  width: 100%;
+  text-align: center;
 }
 
 .savedBtn {
@@ -422,8 +446,7 @@
   font-weight: 600;
   background: rgba(24, 128, 56, 0.12);
   color: #137333;
-  margin-left: 8px;
-  margin-bottom: 12px;
+  margin: 8px 0 12px;
   cursor: pointer;
 }
 
@@ -440,9 +463,10 @@
   font-weight: 600;
   background: #fff;
   color: var(--color-text-secondary);
-  margin-left: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   cursor: pointer;
+  width: 100%;
+  text-align: center;
 }
 
 .savedNote {
@@ -459,9 +483,63 @@
   font-weight: 600;
   background: rgba(26, 115, 232, 0.08);
   color: #145fcf;
-  margin-left: 8px;
-  margin-bottom: 12px;
+  margin: 0 0 12px;
   cursor: pointer;
+}
+
+.hoursUnknownRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.addHoursBtn {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.hoursForm {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.toggleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.hoursInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.hoursInputs label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.hoursInputs input {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  font-size: 14px;
 }
 
 .keyWarning {
@@ -531,7 +609,27 @@
 }
 
 .fileInput {
+  display: none;
+}
+
+.photoUploadBtn {
+  width: 100%;
+  border: 1px dashed rgba(26, 115, 232, 0.5);
+  background: rgba(26, 115, 232, 0.06);
+  color: #145fcf;
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.photoUploadHint {
   margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-muted);
 }
 
 .photoModal {

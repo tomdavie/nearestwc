@@ -270,10 +270,6 @@ function Profile() {
         </p>
       </section>
 
-      <Link to="/safe-route" className={styles.safeRouteLink}>
-        Plan a safe route 🗺️
-      </Link>
-
       <h2 className={styles.sectionTitle}>Your Contribution to Humanity 🌍</h2>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
@@ -398,7 +394,7 @@ function Profile() {
           <span>I use a RADAR key</span>
         </label>
         <label className={styles.ibdRow}>
-          <span className={styles.ibdToggleText}>IBD Mode 🏥</span>
+          <span className={styles.ibdToggleText}>Desperate Mode 🚨</span>
           <input
             type="checkbox"
             checked={ibdMode}
@@ -410,8 +406,7 @@ function Profile() {
           />
         </label>
         <p className={styles.ibdHint}>
-          Optimises the map for urgent needs - sorts by distance, hides paid toilets, filters to clean and
-          accessible options.
+          When you really, really need to go. Sorts by distance and shows free toilets first.
         </p>
         {savingPrefs && <p className={styles.muted}>Saving profile preferences…</p>}
       </div>

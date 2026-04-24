@@ -601,8 +601,8 @@ function MapView() {
       {ibdMode && (
         <div className={styles.ibdBanner}>
           {isIbdFallbackActive
-            ? '🏥 IBD Mode - showing nearest available toilets'
-            : '🏥 IBD Mode active - showing nearest clean, free toilets'}
+            ? '🚨 Desperate Mode - nearest free toilets first'
+            : '🚨 Desperate Mode - nearest free toilets first'}
         </div>
       )}
 
@@ -615,7 +615,8 @@ function MapView() {
         <button
           type="button"
           className={`${styles.ibdQuickBtn} ${ibdMode ? styles.ibdQuickBtnActive : ''}`}
-          title={ibdMode ? 'Turn IBD mode off' : 'Turn IBD mode on'}
+          title="Desperate Mode"
+          aria-label="Desperate Mode"
           onClick={() => {
             if (!user?.id) return
             const next = !ibdMode
@@ -625,7 +626,7 @@ function MapView() {
           }}
           disabled={!user?.id || savingIbdMode}
         >
-          🏥
+          🚨
         </button>
       )}
 

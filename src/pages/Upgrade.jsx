@@ -9,7 +9,7 @@ import styles from './Upgrade.module.css'
 
 const FEATURES = [
   '🚨 Urgent Mode - one tap to the nearest open, free, highly rated WC. No browsing. Just go.',
-  '🗺️ Safe Route Planning - map WCs along your journey before you leave the house',
+  '🗺️ Safe Route Planning - map toilets along your journey before you leave (coming soon)',
   '⭐ Saved Favourites - bookmark your trusted WCs for instant access',
   '🏥 Condition Profile - tell us about your needs and get tailored results',
   '🔑 RADAR Key Indicator - see which WCs accept the National Key Scheme',

@@ -46,7 +46,7 @@ function Landing() {
         style={{
           ...sectionBase,
           minHeight: '100dvh',
-          paddingTop: '20px',
+          paddingTop: 'max(80px, calc(env(safe-area-inset-top) + 60px))',
           paddingBottom: isMobile ? '36px' : '52px',
           background: '#1a73e8',
           color: '#ffffff',
@@ -71,6 +71,7 @@ function Landing() {
               alignItems: isMobile ? 'flex-start' : 'center',
               justifyContent: 'space-between',
               gap: '14px',
+              paddingTop: 'max(12px, env(safe-area-inset-top))',
             }}
           >
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
@@ -387,7 +388,7 @@ function Landing() {
             }}
           >
             <article style={{ ...cardStyle, background: '#f8fafc', border: '1px solid #e7edf8' }}>
-              <h3 style={{ marginBottom: '10px', fontSize: '19px' }}>IBD Mode</h3>
+              <h3 style={{ marginBottom: '10px', fontSize: '19px' }}>Desperate Mode 🚨</h3>
               <p style={{ lineHeight: 1.55 }}>Prioritised nearby toilets when time matters most.</p>
             </article>
             <article style={{ ...cardStyle, background: '#f8fafc', border: '1px solid #e7edf8' }}>

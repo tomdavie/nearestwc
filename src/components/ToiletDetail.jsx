@@ -123,6 +123,16 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   const [userMeta, setUserMeta] = useState(null)
   const [savingFavorite, setSavingFavorite] = useState(false)
   const [showOfferOverlay, setShowOfferOverlay] = useState(false)
+  const [showHoursForm, setShowHoursForm] = useState(false)
+  const [hours24_7, setHours24_7] = useState(false)
+  const [hoursOpen, setHoursOpen] = useState('09:00')
+  const [hoursClose, setHoursClose] = useState('17:00')
+  const [savingHours, setSavingHours] = useState(false)
+  const [openingHoursValue, setOpeningHoursValue] = useState(toilet?.opening_hours ?? null)
+  const [resolvedAddress, setResolvedAddress] = useState('')
+  const [loadingAddress, setLoadingAddress] = useState(false)
+  const addressCacheRef = useRef({})
+  const reviewPhotoInputRef = useRef(null)
   const dragStartY = useRef(null)
 
   const sponsoredBusinessName =
@@ -144,6 +154,46 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     const key = `nwc_saved_toilet_${toilet.id}`
     setSavedThisToilet(window.sessionStorage.getItem(key) === '1')
   }, [toilet?.id])
+
+  useEffect(() => {
+    setOpeningHoursValue(toilet?.opening_hours ?? null)
+    setShowHoursForm(false)
+  }, [toilet?.id, toilet?.opening_hours])
+
+  useEffect(() => {
+    let active = true
+    const toiletId = toilet?.id
+    const lat = Number(toilet?.lat)
+    const lng = Number(toilet?.lng)
+    if (!toiletId || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setResolvedAddress('')
+      return
+    }
+    if (addressCacheRef.current[toiletId]) {
+      setResolvedAddress(addressCacheRef.current[toiletId])
+      return
+    }
+    if (!window.google?.maps?.Geocoder) {
+      setResolvedAddress('')
+      return
+    }
+    setLoadingAddress(true)
+    const geocoder = new window.google.maps.Geocoder()
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (!active) return
+      setLoadingAddress(false)
+      if (status !== 'OK' || !results?.length) {
+        setResolvedAddress('')
+        return
+      }
+      const next = results[0]?.formatted_address || ''
+      addressCacheRef.current[toiletId] = next
+      setResolvedAddress(next)
+    })
+    return () => {
+      active = false
+    }
+  }, [toilet?.id, toilet?.lat, toilet?.lng])
 
   const requestClose = useCallback(() => {
     if (exiting) return
@@ -269,7 +319,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     return out
   }, [toilet])
 
-  const openingHours = useMemo(() => parseOpeningHours(toilet?.opening_hours), [toilet?.opening_hours])
+  const openingHours = useMemo(() => parseOpeningHours(openingHoursValue), [openingHoursValue])
   const dayHoursLines = useMemo(() => {
     if (!openingHours || openingHours.mode !== 'scheduled' || !openingHours.days) return []
     const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -281,6 +331,15 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   const isFavorite = Boolean(toilet?.id && savedToiletIds.includes(toilet.id))
   const shouldShowKeyWarning =
     Boolean(userMeta?.is_pro) && hasBowelCondition(userMeta?.condition_profile) && Boolean(toilet?.requires_key)
+  const streetName = useMemo(() => {
+    if (!resolvedAddress) return ''
+    return resolvedAddress.split(',')[0]?.trim() || ''
+  }, [resolvedAddress])
+  const displayTitle = useMemo(() => {
+    const base = toilet?.name || 'Unnamed toilet'
+    if (base === 'Public Toilet' && streetName) return `Public Toilet, ${streetName}`
+    return base
+  }, [toilet?.name, streetName])
 
   const resetReviewForm = () => {
     setCleanlinessRating(5)
@@ -486,6 +545,44 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  const saveOpeningHours = async (e) => {
+    e.preventDefault()
+    if (!toilet?.id) return
+    if (!hours24_7 && (!hoursOpen || !hoursClose)) {
+      showToast('Please add opening and closing times.', 'error')
+      return
+    }
+
+    const nextOpeningHours = hours24_7
+      ? { mode: '24_7' }
+      : {
+          mode: 'scheduled',
+          days: {
+            Mon: { open: hoursOpen, close: hoursClose },
+            Tue: { open: hoursOpen, close: hoursClose },
+            Wed: { open: hoursOpen, close: hoursClose },
+            Thu: { open: hoursOpen, close: hoursClose },
+            Fri: { open: hoursOpen, close: hoursClose },
+            Sat: { open: hoursOpen, close: hoursClose },
+            Sun: { open: hoursOpen, close: hoursClose },
+          },
+        }
+
+    setSavingHours(true)
+    const { error } = await supabase
+      .from('toilets')
+      .update({ opening_hours: nextOpeningHours })
+      .eq('id', toilet.id)
+    setSavingHours(false)
+    if (error) {
+      showToast(error.message, 'error')
+      return
+    }
+    setOpeningHoursValue(nextOpeningHours)
+    setShowHoursForm(false)
+    showToast('Thanks for adding hours! 🕐', 'success')
+  }
+
   const handleShare = async () => {
     const shareUrl = `https://nearestwc.app/wc/${toilet.id}`
     const payload = {
@@ -644,26 +741,24 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
           )}
 
           <h2 id="toilet-detail-title" className={styles.title}>
-            {toilet.name || 'Unnamed toilet'}
+            {displayTitle}
           </h2>
-          {showIbdFriendlyBadge && (
-            <p className={styles.ibdBadge}>✅ IBD Friendly - rated by the community</p>
+          {(resolvedAddress || loadingAddress) && (
+            <button type="button" className={styles.addressBtn} onClick={openDirections}>
+              {loadingAddress ? 'Finding address…' : resolvedAddress}
+            </button>
           )}
-          <button type="button" className={styles.shareBtn} onClick={handleShare}>
-            🔗 Share this WC
-          </button>
-          <button type="button" className={styles.directionsBtn} onClick={openDirections}>
-            🗺️ Get directions
-          </button>
-          <button
-            type="button"
-            className={styles.savedBtn}
-            onClick={markSavedMe}
-            disabled={savingToilet || savedThisToilet}
-          >
-            {savedThisToilet ? 'Saved me! 🙌' : savingToilet ? 'Saving…' : 'This saved me 🙌'}
-          </button>
-          {savedThisToilet && <p className={styles.savedNote}>+2 points awarded to the person who added this WC</p>}
+          {showIbdFriendlyBadge && (
+            <p className={styles.ibdBadge}>✅ Desperate Friendly - rated by the community</p>
+          )}
+          <div className={styles.topActionsRow}>
+            <button type="button" className={styles.directionsBtn} onClick={openDirections}>
+              🗺️ Get Directions
+            </button>
+            <button type="button" className={styles.shareBtn} onClick={handleShare}>
+              🔗 Share
+            </button>
+          </div>
           <button
             type="button"
             className={styles.favouriteBtn}
@@ -715,7 +810,50 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
               ))}
             </ul>
           ) : (
-            <p className={styles.hoursUnknown}>Hours unknown</p>
+            <div className={styles.hoursUnknownRow}>
+              <p className={styles.hoursUnknown}>Hours unknown</p>
+              <button type="button" className={styles.addHoursBtn} onClick={() => setShowHoursForm((v) => !v)}>
+                Add hours ✏️
+              </button>
+            </div>
+          )}
+
+          {showHoursForm && (
+            <form className={styles.hoursForm} onSubmit={saveOpeningHours}>
+              <label className={styles.toggleRow}>
+                <input
+                  type="checkbox"
+                  checked={hours24_7}
+                  onChange={(e) => setHours24_7(e.target.checked)}
+                />
+                <span>Open 24 hours</span>
+              </label>
+              {!hours24_7 && (
+                <div className={styles.hoursInputs}>
+                  <label>
+                    Open
+                    <input
+                      type="time"
+                      value={hoursOpen}
+                      onChange={(e) => setHoursOpen(e.target.value)}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Close
+                    <input
+                      type="time"
+                      value={hoursClose}
+                      onChange={(e) => setHoursClose(e.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+              )}
+              <button type="submit" className={styles.submit} disabled={savingHours}>
+                {savingHours ? 'Saving…' : 'Save hours'}
+              </button>
+            </form>
           )}
 
           {toilet.access_code && (
@@ -793,7 +931,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                       )}
                       {r.ibd_friendly != null && (
                         <span className={styles.facilityChip}>
-                          IBD friendly: {r.ibd_friendly ? 'Yes' : 'No'}
+                          Desperate friendly: {r.ibd_friendly ? 'Yes' : 'No'}
                         </span>
                       )}
                     </p>
@@ -829,6 +967,15 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
               ))}
             </ul>
           )}
+          <button
+            type="button"
+            className={styles.savedBtn}
+            onClick={markSavedMe}
+            disabled={savingToilet || savedThisToilet}
+          >
+            {savedThisToilet ? 'Saved me! 🙌' : savingToilet ? 'Saving…' : 'This saved me 🙌'}
+          </button>
+          {savedThisToilet && <p className={styles.savedNote}>+2 points awarded to the person who added this WC</p>}
 
           {user ? (
             <>
@@ -841,142 +988,151 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
               </button>
               {showReviewForm && (
                 <form className={styles.form} onSubmit={handleSubmitReview}>
-              <div>
-                <p className={styles.fieldLabel} id="cleanliness-label">
-                  Cleanliness
-                </p>
-                <div className={styles.starPicker} role="group" aria-labelledby="cleanliness-label">
-                  {[1, 2, 3, 4, 5].map((n) => (
+                  <div>
+                    <p className={styles.fieldLabel} id="overall-label">
+                      Overall rating
+                    </p>
+                    <div className={styles.starPicker} role="group" aria-labelledby="overall-label">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`${styles.starBtn} ${n <= overallRating ? styles.starBtnActive : ''}`}
+                          onClick={() => setOverallRating(n)}
+                          aria-label={`Overall ${n} of 5`}
+                          aria-pressed={n <= overallRating}
+                        >
+                          <StarIcon filled={n <= overallRating} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className={styles.fieldLabel} id="cleanliness-label">
+                      Cleanliness
+                    </p>
+                    <div className={styles.starPicker} role="group" aria-labelledby="cleanliness-label">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`${styles.starBtn} ${n <= cleanlinessRating ? styles.starBtnActive : ''}`}
+                          onClick={() => setCleanlinessRating(n)}
+                          aria-label={`Cleanliness ${n} of 5`}
+                          aria-pressed={n <= cleanlinessRating}
+                        >
+                          <StarIcon filled={n <= cleanlinessRating} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className={styles.fieldLabel} id="roll-label">
+                      Toilet roll available
+                    </p>
+                    <div className={styles.seg} role="group" aria-labelledby="roll-label">
+                      <button
+                        type="button"
+                        className={`${styles.segBtn} ${hasToiletRoll ? styles.segBtnActive : ''}`}
+                        onClick={() => setHasToiletRoll(true)}
+                        aria-pressed={hasToiletRoll}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.segBtn} ${!hasToiletRoll ? styles.segBtnActive : ''}`}
+                        onClick={() => setHasToiletRoll(false)}
+                        aria-pressed={!hasToiletRoll}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className={styles.fieldLabel} id="soap-label">
+                      Soap available
+                    </p>
+                    <div className={styles.seg} role="group" aria-labelledby="soap-label">
+                      <button
+                        type="button"
+                        className={`${styles.segBtn} ${hasSoap ? styles.segBtnActive : ''}`}
+                        onClick={() => setHasSoap(true)}
+                        aria-pressed={hasSoap}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.segBtn} ${!hasSoap ? styles.segBtnActive : ''}`}
+                        onClick={() => setHasSoap(false)}
+                        aria-pressed={!hasSoap}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className={styles.fieldLabel} id="ibd-friendly-label">
+                      Desperate Friendly?
+                    </p>
+                    <div className={styles.seg} role="group" aria-labelledby="ibd-friendly-label">
+                      <button
+                        type="button"
+                        className={`${styles.segBtn} ${ibdFriendly ? styles.segBtnActive : ''}`}
+                        onClick={() => setIbdFriendly(true)}
+                        aria-pressed={ibdFriendly}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.segBtn} ${!ibdFriendly ? styles.segBtnActive : ''}`}
+                        onClick={() => setIbdFriendly(false)}
+                        aria-pressed={!ibdFriendly}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                  <div>
                     <button
-                      key={n}
                       type="button"
-                      className={`${styles.starBtn} ${n <= cleanlinessRating ? styles.starBtnActive : ''}`}
-                      onClick={() => setCleanlinessRating(n)}
-                      aria-label={`Cleanliness ${n} of 5`}
-                      aria-pressed={n <= cleanlinessRating}
+                      className={styles.photoUploadBtn}
+                      onClick={() => reviewPhotoInputRef.current?.click()}
                     >
-                      <StarIcon filled={n <= cleanlinessRating} />
+                      📷 Add entrance photo (optional)
                     </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className={styles.fieldLabel} id="overall-label">
-                  Overall rating
-                </p>
-                <div className={styles.starPicker} role="group" aria-labelledby="overall-label">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      className={`${styles.starBtn} ${n <= overallRating ? styles.starBtnActive : ''}`}
-                      onClick={() => setOverallRating(n)}
-                      aria-label={`Overall ${n} of 5`}
-                      aria-pressed={n <= overallRating}
-                    >
-                      <StarIcon filled={n <= overallRating} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className={styles.fieldLabel} id="roll-label">
-                  Toilet roll available
-                </p>
-                <div className={styles.seg} role="group" aria-labelledby="roll-label">
-                  <button
-                    type="button"
-                    className={`${styles.segBtn} ${hasToiletRoll ? styles.segBtnActive : ''}`}
-                    onClick={() => setHasToiletRoll(true)}
-                    aria-pressed={hasToiletRoll}
-                  >
-                    Yes
+                    <input
+                      ref={reviewPhotoInputRef}
+                      className={styles.fileInput}
+                      type="file"
+                      accept="image/*"
+                      onChange={onReviewPhotoChange}
+                    />
+                    <p className={styles.photoUploadHint}>
+                      Show people where to find it - a photo of the entrance or access point helps a lot 📍
+                    </p>
+                    {reviewPhotoPreview && (
+                      <img src={reviewPhotoPreview} alt="Review preview" className={styles.reviewThumbLarge} />
+                    )}
+                  </div>
+                  <div>
+                    <label className={styles.fieldLabel} htmlFor="review-comment">
+                      Anything else?
+                    </label>
+                    <textarea
+                      id="review-comment"
+                      className={styles.textarea}
+                      placeholder="Anything else worth knowing? Don't be shy."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      rows={4}
+                    />
+                  </div>
+                  <button className={styles.submit} type="submit" disabled={submitting}>
+                    {submitting ? 'Posting…' : 'Post review'}
                   </button>
-                  <button
-                    type="button"
-                    className={`${styles.segBtn} ${!hasToiletRoll ? styles.segBtnActive : ''}`}
-                    onClick={() => setHasToiletRoll(false)}
-                    aria-pressed={!hasToiletRoll}
-                  >
-                    No
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p className={styles.fieldLabel} id="soap-label">
-                  Soap available
-                </p>
-                <div className={styles.seg} role="group" aria-labelledby="soap-label">
-                  <button
-                    type="button"
-                    className={`${styles.segBtn} ${hasSoap ? styles.segBtnActive : ''}`}
-                    onClick={() => setHasSoap(true)}
-                    aria-pressed={hasSoap}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.segBtn} ${!hasSoap ? styles.segBtnActive : ''}`}
-                    onClick={() => setHasSoap(false)}
-                    aria-pressed={!hasSoap}
-                  >
-                    No
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p className={styles.fieldLabel} id="ibd-friendly-label">
-                  IBD Friendly?
-                </p>
-                <div className={styles.seg} role="group" aria-labelledby="ibd-friendly-label">
-                  <button
-                    type="button"
-                    className={`${styles.segBtn} ${ibdFriendly ? styles.segBtnActive : ''}`}
-                    onClick={() => setIbdFriendly(true)}
-                    aria-pressed={ibdFriendly}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.segBtn} ${!ibdFriendly ? styles.segBtnActive : ''}`}
-                    onClick={() => setIbdFriendly(false)}
-                    aria-pressed={!ibdFriendly}
-                  >
-                    No
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className={styles.fieldLabel} htmlFor="review-comment">
-                  Anything else?
-                </label>
-                <textarea
-                  id="review-comment"
-                  className={styles.textarea}
-                  placeholder="Anything else worth knowing? Don't be shy."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={4}
-                />
-                <input
-                  className={styles.fileInput}
-                  type="file"
-                  accept="image/*"
-                  onChange={onReviewPhotoChange}
-                />
-                {reviewPhotoPreview && (
-                  <img src={reviewPhotoPreview} alt="Review preview" className={styles.reviewThumbLarge} />
-                )}
-              </div>
-              <button className={styles.submit} type="submit" disabled={submitting}>
-                {submitting ? 'Posting…' : 'Post review'}
-              </button>
                 </form>
               )}
             </>
