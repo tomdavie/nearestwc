@@ -25,21 +25,13 @@
 }
 
 @keyframes sheetUp {
-  from {
-    transform: translateY(104%);
-  }
-  to {
-    transform: translateY(0);
-  }
+  from { transform: translateY(104%); }
+  to { transform: translateY(0); }
 }
 
 @keyframes sheetDown {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(104%);
-  }
+  from { transform: translateY(0); }
+  to { transform: translateY(104%); }
 }
 
 .sheetExit {
@@ -47,15 +39,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet {
-    animation: none;
-    transform: translateY(0);
-  }
-
-  .sheetExit {
-    animation: none;
-    transform: translateY(104%);
-  }
+  .sheet { animation: none; transform: translateY(0); }
+  .sheetExit { animation: none; transform: translateY(104%); }
 }
 
 .header {
@@ -73,9 +58,7 @@
   touch-action: none;
 }
 
-.dragZone:active {
-  cursor: grabbing;
-}
+.dragZone:active { cursor: grabbing; }
 
 .handle {
   width: 40px;
@@ -168,9 +151,7 @@
   font-weight: 700;
 }
 
-.sponsoredText {
-  min-width: 0;
-}
+.sponsoredText { min-width: 0; }
 
 .sponsoredBusinessName {
   margin: 0 0 4px;
@@ -299,9 +280,7 @@
   cursor: pointer;
 }
 
-.addressBtn:hover {
-  text-decoration: underline;
-}
+.addressBtn:hover { text-decoration: underline; }
 
 .topActionsRow {
   display: grid;
@@ -385,9 +364,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.hoursLine {
-  margin: 0 0 14px;
-}
+.hoursLine { margin: 0 0 14px; }
 
 .hoursUnknown {
   margin: 0 0 14px;
@@ -524,14 +501,14 @@
 .inlineSuggest {
   margin: -2px 0 12px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   flex-wrap: wrap;
   font-size: 12px;
   color: var(--color-text-muted);
 }
 
-.inlineSuggest button {
+.inlineSuggest > button {
   border: none;
   background: transparent;
   color: var(--color-primary);
@@ -543,8 +520,9 @@
 
 .inlineSuggestForm {
   display: flex;
-  gap: 6px;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 .inlineSuggestForm input,
@@ -553,6 +531,31 @@
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   font-size: 12px;
+}
+
+.accessToggle {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.accessToggleBtn {
+  flex: 1;
+  padding: 10px 16px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border: 2px solid #d1d5db !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.accessToggleBtnActive {
+  background: #1a73e8 !important;
+  border-color: #1a73e8 !important;
+  color: #ffffff !important;
 }
 
 .inlineEditReview {
@@ -611,10 +614,7 @@
   margin-bottom: 14px;
 }
 
-.hoursEditor {
-  display: grid;
-  gap: 10px;
-}
+.hoursEditor { display: grid; gap: 10px; }
 
 .daysPillsRow {
   display: flex;
@@ -654,10 +654,7 @@
   cursor: pointer;
 }
 
-.hoursDayRows {
-  display: grid;
-  gap: 8px;
-}
+.hoursDayRows { display: grid; gap: 8px; }
 
 .hoursDayRow {
   display: grid;
@@ -780,9 +777,7 @@
   margin-top: 8px;
 }
 
-.fileInput {
-  display: none;
-}
+.fileInput { display: none; }
 
 .photoUploadBtn {
   width: 100%;
@@ -832,9 +827,7 @@
   color: #f9ab00;
 }
 
-.starMuted {
-  color: var(--color-border);
-}
+.starMuted { color: var(--color-border); }
 
 .avgLabel {
   font-size: 14px;
@@ -901,9 +894,7 @@
   margin-bottom: 16px;
 }
 
-.loginHint a {
-  font-weight: 600;
-}
+.loginHint a { font-weight: 600; }
 
 .form {
   display: flex;
@@ -932,8 +923,7 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease,
-    transform 0.12s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
 
 .starBtn:hover {
@@ -966,9 +956,7 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.textarea::placeholder {
-  color: var(--color-text-muted);
-}
+.textarea::placeholder { color: var(--color-text-muted); }
 
 .textarea:focus {
   outline: none;
@@ -988,9 +976,7 @@
   transition: background 0.15s ease, transform 0.12s ease;
 }
 
-.submit:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-}
+.submit:hover:not(:disabled) { background: var(--color-primary-hover); }
 
 .submit:disabled {
   opacity: 0.55;
@@ -1033,29 +1019,14 @@
 }
 
 @keyframes celebratePop {
-  0% {
-    opacity: 0;
-    transform: translateY(12px) scale(0.96);
-  }
-  12% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  78% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
+  0% { opacity: 0; transform: translateY(12px) scale(0.96); }
+  12% { opacity: 1; transform: translateY(0) scale(1); }
+  78% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-6px) scale(0.98); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .successCard {
-    animation: none;
-    opacity: 1;
-  }
+  .successCard { animation: none; opacity: 1; }
 }
 
 .seg {
@@ -1078,9 +1049,7 @@
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.segBtn + .segBtn {
-  margin-left: -1px;
-}
+.segBtn + .segBtn { margin-left: -1px; }
 
 .segBtnActive {
   background: #1a73e8;
@@ -1145,29 +1114,14 @@
 }
 
 @keyframes badgeFanfareIn {
-  0% {
-    opacity: 0;
-    transform: translateY(16px) scale(0.94);
-  }
-  10% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  82% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.97);
-  }
+  0% { opacity: 0; transform: translateY(16px) scale(0.94); }
+  10% { opacity: 1; transform: translateY(0) scale(1); }
+  82% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-10px) scale(0.97); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .badgeFanfareCard {
-    animation: none;
-    opacity: 1;
-  }
+  .badgeFanfareCard { animation: none; opacity: 1; }
 }
 
 .reviewerSays {
@@ -1178,9 +1132,7 @@
   line-height: 1.4;
 }
 
-.reviewerTag {
-  color: var(--color-text);
-}
+.reviewerTag { color: var(--color-text); }
 
 .helpfulBtn {
   margin-top: 10px;

@@ -1314,17 +1314,17 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
               </button>
             ) : (
               <div className={styles.inlineSuggestForm}>
-                <div className={styles.verifyActions}>
+                <div className={styles.accessToggle}>
                   <button
                     type="button"
-                    className={`${styles.segBtn} ${accessMode === 'none' ? styles.segBtnActive : ''}`}
+                    className={`${styles.accessToggleBtn} ${accessMode === 'none' ? styles.accessToggleBtnActive : ''}`}
                     onClick={() => setAccessMode('none')}
                   >
                     No code needed
                   </button>
                   <button
                     type="button"
-                    className={`${styles.segBtn} ${accessMode === 'code' ? styles.segBtnActive : ''}`}
+                    className={`${styles.accessToggleBtn} ${accessMode === 'code' ? styles.accessToggleBtnActive : ''}`}
                     onClick={() => setAccessMode('code')}
                   >
                     Code required
