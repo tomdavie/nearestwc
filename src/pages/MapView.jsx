@@ -356,6 +356,21 @@ function MapView() {
         return false
       }
       if (!parsed) return false
+      if (parsed.is24hours === true) return true
+      if (parsed.days && typeof parsed.days === 'object' && !parsed.mode) {
+        const dayKeyMap = {
+          Sun: 'sun',
+          Mon: 'mon',
+          Tue: 'tue',
+          Wed: 'wed',
+          Thu: 'thu',
+          Fri: 'fri',
+          Sat: 'sat',
+        }
+        const slot = parsed.days[dayKeyMap[weekday]]
+        if (!slot?.open || !slot?.close) return false
+        return currentTime >= slot.open && currentTime <= slot.close
+      }
       if (parsed.mode === '24_7') return true
       if (parsed.mode !== 'scheduled' || !parsed.days) return false
       const daySlot = parsed.days[weekday]
@@ -364,6 +379,7 @@ function MapView() {
     }
 
     const baseRows = toilets.filter((t) => {
+      if (t.is_closed) return false
       if (freeOnly && !t.is_free) return false
       if (accessibleOnly && !t.is_accessible) return false
       if (!isOpenNow(t)) return false

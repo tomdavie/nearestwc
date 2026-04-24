@@ -20,6 +20,32 @@ const REPORT_REASONS = [
   'Offensive content',
   'Other',
 ]
+const LOCATION_TYPE_OPTIONS = [
+  'Train Station',
+  'Shopping Centre',
+  'Airport',
+  'Park',
+  'Restaurant/Café',
+  'Hotel',
+  'Street/Public',
+  'Other',
+]
+
+const DAYS = [
+  { key: 'mon', label: 'Mon' },
+  { key: 'tue', label: 'Tue' },
+  { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' },
+  { key: 'fri', label: 'Fri' },
+  { key: 'sat', label: 'Sat' },
+  { key: 'sun', label: 'Sun' },
+]
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hours = String(Math.floor(i / 2)).padStart(2, '0')
+  const minutes = i % 2 === 0 ? '00' : '30'
+  return `${hours}:${minutes}`
+})
 
 function StarIcon({ filled }) {
   return (
@@ -80,9 +106,103 @@ function parseOpeningHours(raw) {
   return null
 }
 
-function formatDayHours(day, hours) {
-  if (!hours?.open || !hours?.close) return null
-  return `${day}: ${hours.open} - ${hours.close}`
+function normalizeOpeningHours(raw) {
+  const parsed = parseOpeningHours(raw)
+  const empty = {
+    is24hours: false,
+    days: DAYS.reduce((acc, day) => {
+      acc[day.key] = null
+      return acc
+    }, {}),
+  }
+  if (!parsed) return empty
+
+  if (parsed.is24hours === true) {
+    return {
+      ...empty,
+      is24hours: true,
+    }
+  }
+
+  if (parsed.mode === '24_7') {
+    return {
+      ...empty,
+      is24hours: true,
+    }
+  }
+
+  const normalizedDays = { ...empty.days }
+
+  // New schema keys: mon..sun
+  for (const day of DAYS) {
+    const entry = parsed.days?.[day.key]
+    if (entry?.open && entry?.close) {
+      normalizedDays[day.key] = { open: entry.open, close: entry.close }
+    }
+  }
+
+  // Legacy schema keys: Mon..Sun
+  for (const day of DAYS) {
+    const legacyKey = day.label
+    const entry = parsed.days?.[legacyKey]
+    if (entry?.open && entry?.close) {
+      normalizedDays[day.key] = { open: entry.open, close: entry.close }
+    }
+  }
+
+  return {
+    is24hours: false,
+    days: normalizedDays,
+  }
+}
+
+function formatDayRange(startIdx, endIdx) {
+  if (startIdx === endIdx) return DAYS[startIdx].label
+  return `${DAYS[startIdx].label}-${DAYS[endIdx].label}`
+}
+
+function groupRangesByValue(values, wanted) {
+  const ranges = []
+  let start = null
+  for (let i = 0; i < values.length; i += 1) {
+    if (values[i] === wanted && start === null) start = i
+    if ((values[i] !== wanted || i === values.length - 1) && start !== null) {
+      const end = values[i] === wanted && i === values.length - 1 ? i : i - 1
+      ranges.push([start, end])
+      start = null
+    }
+  }
+  return ranges
+}
+
+function summarizeOpeningHours(normalized) {
+  if (normalized.is24hours) return 'Open 24 hours'
+  const dayValues = DAYS.map((d) => normalized.days[d.key])
+
+  const openMap = {}
+  dayValues.forEach((v) => {
+    if (!v) return
+    const key = `${v.open}-${v.close}`
+    if (!openMap[key]) openMap[key] = []
+  })
+
+  const openParts = []
+  for (const [slot, _] of Object.entries(openMap)) {
+    const ranges = groupRangesByValue(
+      dayValues.map((v) => (v ? `${v.open}-${v.close}` : null)),
+      slot,
+    )
+    if (!ranges.length) continue
+    const labelRanges = ranges.map(([start, end]) => formatDayRange(start, end)).join(', ')
+    openParts.push(`${labelRanges} ${slot}`)
+  }
+
+  const closedRanges = groupRangesByValue(dayValues.map((v) => (v ? 'open' : 'closed')), 'closed')
+  const closedPart = closedRanges.length
+    ? `${closedRanges.map(([start, end]) => formatDayRange(start, end)).join(', ')} closed`
+    : ''
+
+  return [openParts.join(', '), closedPart].filter(Boolean).join(', ') || 'Hours unknown'
 }
 
 function hasBowelCondition(conditionProfile) {
@@ -125,12 +245,29 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   const [showOfferOverlay, setShowOfferOverlay] = useState(false)
   const [showHoursForm, setShowHoursForm] = useState(false)
   const [hours24_7, setHours24_7] = useState(false)
-  const [hoursOpen, setHoursOpen] = useState('09:00')
-  const [hoursClose, setHoursClose] = useState('17:00')
+  const [hoursByDay, setHoursByDay] = useState(
+    DAYS.reduce((acc, day) => {
+      acc[day.key] = { enabled: false, open: '09:00', close: '17:00' }
+      return acc
+    }, {}),
+  )
   const [savingHours, setSavingHours] = useState(false)
   const [openingHoursValue, setOpeningHoursValue] = useState(toilet?.opening_hours ?? null)
   const [resolvedAddress, setResolvedAddress] = useState('')
   const [loadingAddress, setLoadingAddress] = useState(false)
+  const [editingReviewId, setEditingReviewId] = useState(null)
+  const [editingReviewValues, setEditingReviewValues] = useState(null)
+  const [savingReviewEdit, setSavingReviewEdit] = useState(false)
+  const [pendingReport, setPendingReport] = useState(null)
+  const [verifyingReport, setVerifyingReport] = useState(false)
+  const [suggestCostOpen, setSuggestCostOpen] = useState(false)
+  const [suggestCostValue, setSuggestCostValue] = useState('')
+  const [accessEditOpen, setAccessEditOpen] = useState(false)
+  const [accessMode, setAccessMode] = useState('code')
+  const [accessCodeDraft, setAccessCodeDraft] = useState('')
+  const [suggestLocationTypeOpen, setSuggestLocationTypeOpen] = useState(false)
+  const [suggestLocationTypeValue, setSuggestLocationTypeValue] = useState('Street/Public')
+  const [savingSuggestion, setSavingSuggestion] = useState(false)
   const addressCacheRef = useRef({})
   const reviewPhotoInputRef = useRef(null)
   const dragStartY = useRef(null)
@@ -159,6 +296,20 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     setOpeningHoursValue(toilet?.opening_hours ?? null)
     setShowHoursForm(false)
   }, [toilet?.id, toilet?.opening_hours])
+
+  useEffect(() => {
+    const normalized = normalizeOpeningHours(openingHoursValue)
+    setHours24_7(Boolean(normalized.is24hours))
+    setHoursByDay(
+      DAYS.reduce((acc, day) => {
+        const entry = normalized.days[day.key]
+        acc[day.key] = entry
+          ? { enabled: true, open: entry.open, close: entry.close }
+          : { enabled: false, open: '09:00', close: '17:00' }
+        return acc
+      }, {}),
+    )
+  }, [openingHoursValue])
 
   useEffect(() => {
     let active = true
@@ -249,6 +400,30 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     setLoadingReviews(false)
   }, [toilet?.id, showToast])
 
+  const loadPendingReport = useCallback(async () => {
+    if (!toilet?.id || !user?.id) {
+      setPendingReport(null)
+      return
+    }
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, toilet_id, user_id, reason, pending_review, confirmed_count, dismissed_count')
+      .eq('toilet_id', toilet.id)
+      .eq('pending_review', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) {
+      setPendingReport(null)
+      return
+    }
+    if (!data || data.user_id === user.id) {
+      setPendingReport(null)
+      return
+    }
+    setPendingReport(data)
+  }, [toilet?.id, user?.id])
+
   const refreshPoints = useCallback(async () => {
     if (!user?.id) {
       setUserPoints(null)
@@ -281,6 +456,10 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   }, [refreshPoints])
 
   useEffect(() => {
+    loadPendingReport()
+  }, [loadPendingReport])
+
+  useEffect(() => {
     const onPoints = () => {
       refreshPoints()
     }
@@ -308,6 +487,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     return yesCount / marked.length
   }, [reviews])
   const showIbdFriendlyBadge = ibdFriendlyShare > 0.5
+  const quickAccessCount = Number(toilet?.saves_count) || 0
 
   const tags = useMemo(() => {
     if (!toilet) return []
@@ -319,14 +499,8 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     return out
   }, [toilet])
 
-  const openingHours = useMemo(() => parseOpeningHours(openingHoursValue), [openingHoursValue])
-  const dayHoursLines = useMemo(() => {
-    if (!openingHours || openingHours.mode !== 'scheduled' || !openingHours.days) return []
-    const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    return order
-      .map((day) => formatDayHours(day, openingHours.days[day]))
-      .filter(Boolean)
-  }, [openingHours])
+  const openingHours = useMemo(() => normalizeOpeningHours(openingHoursValue), [openingHoursValue])
+  const openingHoursSummary = useMemo(() => summarizeOpeningHours(openingHours), [openingHours])
   const savedToiletIds = Array.isArray(userMeta?.saved_toilets) ? userMeta.saved_toilets : []
   const isFavorite = Boolean(toilet?.id && savedToiletIds.includes(toilet.id))
   const shouldShowKeyWarning =
@@ -340,6 +514,13 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     if (base === 'Public Toilet' && streetName) return `Public Toilet, ${streetName}`
     return base
   }, [toilet?.name, streetName])
+  const locationType = toilet?.location_type || ''
+  const accessState = useMemo(() => {
+    if (toilet?.requires_key === false) return 'no_code'
+    if (toilet?.requires_key === true && toilet?.access_code) return 'code_set'
+    if (toilet?.requires_key === true) return 'code_required'
+    return 'unknown'
+  }, [toilet?.requires_key, toilet?.access_code])
 
   const resetReviewForm = () => {
     setCleanlinessRating(5)
@@ -426,7 +607,12 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       return
     }
     const next = (Number(rev.helpful_count) || 0) + 1
-    const { error: e2 } = await supabase.from('reviews').update({ helpful_count: next }).eq('id', reviewId)
+    const { error: e2 } = await supabase
+      .from('reviews')
+      .update({ helpful_count: next })
+      .eq('id', reviewId)
+      .select()
+      .single()
     if (e2) {
       showToast(e2.message, 'error')
       setHelpfulLoadingId(null)
@@ -479,13 +665,18 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     }
     setSavingToilet(true)
     const next = (Number(toilet.saves_count) || 0) + 1
-    const { error } = await supabase.from('toilets').update({ saves_count: next }).eq('id', toilet.id)
+    const { data, error } = await supabase
+      .from('toilets')
+      .update({ saves_count: next })
+      .eq('id', toilet.id)
+      .select()
+      .single()
     setSavingToilet(false)
     if (error) {
       showToast(error.message, 'error')
       return
     }
-    toilet.saves_count = next
+    toilet.saves_count = Number(data?.saves_count) || next
     const key = `nwc_saved_toilet_${toilet.id}`
     window.sessionStorage.setItem(key, '1')
     setSavedThisToilet(true)
@@ -494,7 +685,113 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     } catch (err) {
       showToast(err?.message || 'Saved, but points award failed.', 'error')
     }
-    showToast('Saved me! 🙌 Thanks for supporting this contributor.', 'success')
+    showToast(`You've been saved! 🙌 This toilet has now helped ${next} people`, 'success')
+  }
+
+  const startEditReview = (review) => {
+    setEditingReviewId(review.id)
+    setEditingReviewValues({
+      overall_rating: Number(review.overall_rating ?? review.rating) || 5,
+      cleanliness: Number(review.cleanliness) || 5,
+      has_toilet_roll: review.has_toilet_roll ?? true,
+      has_soap: review.has_soap ?? true,
+      ibd_friendly: review.ibd_friendly ?? true,
+      comment: review.comment || '',
+    })
+  }
+
+  const saveEditedReview = async (reviewId) => {
+    if (!editingReviewValues) return
+    setSavingReviewEdit(true)
+    const payload = {
+      overall_rating: editingReviewValues.overall_rating,
+      rating: editingReviewValues.overall_rating,
+      cleanliness: editingReviewValues.cleanliness,
+      has_toilet_roll: editingReviewValues.has_toilet_roll,
+      has_soap: editingReviewValues.has_soap,
+      ibd_friendly: editingReviewValues.ibd_friendly,
+      comment: editingReviewValues.comment?.trim() || null,
+    }
+    const { error } = await supabase
+      .from('reviews')
+      .update(payload)
+      .eq('id', reviewId)
+      .select()
+      .single()
+    setSavingReviewEdit(false)
+    if (error) {
+      showToast(error.message, 'error')
+      return
+    }
+    setEditingReviewId(null)
+    setEditingReviewValues(null)
+    await loadReviews()
+    showToast('Review updated ✅', 'success')
+  }
+
+  const saveSuggestion = async (patch) => {
+    if (!user?.id || !toilet?.id) {
+      showToast('Please log in to suggest an edit.', 'info')
+      return
+    }
+    setSavingSuggestion(true)
+    const { data, error } = await supabase
+      .from('toilets')
+      .update(patch)
+      .eq('id', toilet.id)
+      .select()
+      .single()
+    if (!error) {
+      Object.assign(toilet, data || patch)
+      try {
+        await incrementUserPoints(user.id, 5)
+      } catch {
+        // non-blocking
+      }
+      showToast('Thanks for the info! +5 points 🏅', 'success')
+    } else {
+      showToast(error.message, 'error')
+    }
+    setSavingSuggestion(false)
+  }
+
+  const submitReportVerification = async (verdict) => {
+    if (!pendingReport || !user?.id) return
+    setVerifyingReport(true)
+    const { error: insertError } = await supabase.from('report_verifications').insert({
+      report_id: pendingReport.id,
+      user_id: user.id,
+      verdict,
+    })
+    if (insertError) {
+      setVerifyingReport(false)
+      showToast(insertError.message, 'error')
+      return
+    }
+    const confirmed = Number(pendingReport.confirmed_count || 0) + (verdict === 'confirmed' ? 1 : 0)
+    const dismissed = Number(pendingReport.dismissed_count || 0) + (verdict === 'dismissed' ? 1 : 0)
+    const reportPatch = { confirmed_count: confirmed, dismissed_count: dismissed }
+    if (dismissed >= 3) reportPatch.pending_review = false
+    if (confirmed >= 3 && pendingReport.reason === 'Permanently closed') {
+      await supabase
+        .from('toilets')
+        .update({ is_closed: true })
+        .eq('id', toilet.id)
+        .select()
+        .single()
+    }
+    if (confirmed >= 3 && pendingReport.reason !== 'Permanently closed') {
+      reportPatch.pending_review = false
+      reportPatch.needs_admin_review = true
+    }
+    await supabase.from('reports').update(reportPatch).eq('id', pendingReport.id)
+    try {
+      await incrementUserPoints(user.id, 3)
+    } catch {
+      // non-blocking
+    }
+    setVerifyingReport(false)
+    await loadPendingReport()
   }
 
   const toggleSavedToilet = async () => {
@@ -548,39 +845,42 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   const saveOpeningHours = async (e) => {
     e.preventDefault()
     if (!toilet?.id) return
-    if (!hours24_7 && (!hoursOpen || !hoursClose)) {
-      showToast('Please add opening and closing times.', 'error')
+    const anyEnabled = DAYS.some((day) => hoursByDay[day.key]?.enabled)
+    if (!hours24_7 && !anyEnabled) {
+      showToast('Select at least one day or choose always open.', 'error')
       return
     }
 
-    const nextOpeningHours = hours24_7
-      ? { mode: '24_7' }
-      : {
-          mode: 'scheduled',
-          days: {
-            Mon: { open: hoursOpen, close: hoursClose },
-            Tue: { open: hoursOpen, close: hoursClose },
-            Wed: { open: hoursOpen, close: hoursClose },
-            Thu: { open: hoursOpen, close: hoursClose },
-            Fri: { open: hoursOpen, close: hoursClose },
-            Sat: { open: hoursOpen, close: hoursClose },
-            Sun: { open: hoursOpen, close: hoursClose },
-          },
-        }
+    const nextOpeningHours = {
+      is24hours: Boolean(hours24_7),
+      days: DAYS.reduce((acc, day) => {
+        const entry = hoursByDay[day.key]
+        acc[day.key] =
+          !hours24_7 && entry?.enabled && entry?.open && entry?.close
+            ? { open: entry.open, close: entry.close }
+            : null
+        return acc
+      }, {}),
+    }
 
     setSavingHours(true)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('toilets')
-      .update({ opening_hours: nextOpeningHours })
+      .update({ opening_hours: JSON.stringify(nextOpeningHours) })
       .eq('id', toilet.id)
+      .select()
+      .single()
+    console.log('[ToiletDetail] opening_hours update response', { data, error })
     setSavingHours(false)
     if (error) {
-      showToast(error.message, 'error')
+      showToast(error.message || 'Failed to save opening hours', 'error')
       return
     }
-    setOpeningHoursValue(nextOpeningHours)
+    // Reflect updated hours immediately in the currently open sheet.
+    toilet.opening_hours = data?.opening_hours ?? JSON.stringify(nextOpeningHours)
+    setOpeningHoursValue(data?.opening_hours ?? nextOpeningHours)
     setShowHoursForm(false)
-    showToast('Thanks for adding hours! 🕐', 'success')
+    showToast('Opening hours saved! 🕐', 'success')
   }
 
   const handleShare = async () => {
@@ -600,6 +900,65 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
     } catch {
       showToast('Could not share right now.', 'error')
     }
+  }
+  const toggleHoursDay = (dayKey) => {
+    setHoursByDay((prev) => ({
+      ...prev,
+      [dayKey]: {
+        ...prev[dayKey],
+        enabled: !prev[dayKey].enabled,
+      },
+    }))
+  }
+
+  const setHoursValue = (dayKey, field, value) => {
+    setHoursByDay((prev) => ({
+      ...prev,
+      [dayKey]: {
+        ...prev[dayKey],
+        [field]: value,
+      },
+    }))
+  }
+
+  const applySameHoursEveryDay = () => {
+    const selected = DAYS.filter((d) => hoursByDay[d.key]?.enabled)
+    if (!selected.length) return
+    const first = hoursByDay[selected[0].key]
+    setHoursByDay((prev) =>
+      DAYS.reduce((acc, day) => {
+        const current = prev[day.key]
+        acc[day.key] = current.enabled
+          ? { ...current, open: first.open, close: first.close }
+          : current
+        return acc
+      }, {}),
+    )
+  }
+
+  const openAccessEditor = () => {
+    if (toilet?.requires_key === false) {
+      setAccessMode('none')
+      setAccessCodeDraft('')
+    } else {
+      setAccessMode('code')
+      setAccessCodeDraft(toilet?.access_code || '')
+    }
+    setAccessEditOpen(true)
+  }
+
+  const saveAccessSettings = async () => {
+    if (accessMode === 'code' && !accessCodeDraft.trim()) {
+      showToast('Please enter an access code or choose no code needed.', 'error')
+      return
+    }
+    const patch =
+      accessMode === 'none'
+        ? { requires_key: false, access_code: null }
+        : { requires_key: true, access_code: accessCodeDraft.trim() }
+    await saveSuggestion(patch)
+    setAccessEditOpen(false)
+    if (patch.requires_key === false) setAccessCodeDraft('')
   }
 
   const submitReport = async (e) => {
@@ -712,6 +1071,19 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
         </div>
 
         <div className={styles.body}>
+          {pendingReport && (
+            <div className={styles.verifyBanner}>
+              <p>⚠️ Someone reported an issue with this toilet - can you help verify?</p>
+              <div className={styles.verifyActions}>
+                <button type="button" onClick={() => submitReportVerification('dismissed')} disabled={verifyingReport}>
+                  Still accurate 👍
+                </button>
+                <button type="button" onClick={() => submitReportVerification('confirmed')} disabled={verifyingReport}>
+                  Confirmed issue 👎
+                </button>
+              </div>
+            </div>
+          )}
           {isSponsored && (
             <>
               <div className={styles.sponsoredBanner}>⭐ Featured Partner</div>
@@ -749,8 +1121,9 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
             </button>
           )}
           {showIbdFriendlyBadge && (
-            <p className={styles.ibdBadge}>✅ Desperate Friendly - rated by the community</p>
+            <p className={styles.ibdBadge}>✅ Quick access - recommended in an emergency</p>
           )}
+          {locationType && <p className={styles.locationTypeBadge}>📍 {locationType}</p>}
           <div className={styles.topActionsRow}>
             <button type="button" className={styles.directionsBtn} onClick={openDirections}>
               🗺️ Get Directions
@@ -796,24 +1169,46 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
             )}
             {toilet.radar_key_accepted && <span className={styles.pill}>🔑 RADAR key accepted</span>}
           </div>
+          {!toilet.is_free && !toilet.cost && (
+            <div className={styles.inlineSuggest}>
+              <span>How much does it cost?</span>
+              {!suggestCostOpen ? (
+                <button type="button" onClick={() => setSuggestCostOpen(true)}>
+                  Add this ✏️
+                </button>
+              ) : (
+                <div className={styles.inlineSuggestForm}>
+                  <input value={suggestCostValue} onChange={(e) => setSuggestCostValue(e.target.value)} placeholder="e.g. 50p" />
+                  <button
+                    type="button"
+                    disabled={savingSuggestion}
+                    onClick={() => {
+                      const costValue = suggestCostValue.trim()
+                      if (!costValue) return
+                      saveSuggestion({ cost: costValue, is_free: false })
+                      setSuggestCostOpen(false)
+                      setSuggestCostValue('')
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
-          {openingHours?.mode === '24_7' ? (
-            <p className={styles.hoursLine}>
-              <span className={styles.pill}>24 hours 🕐</span>
-            </p>
-          ) : dayHoursLines.length > 0 ? (
-            <ul className={styles.hoursList}>
-              {dayHoursLines.map((line) => (
-                <li key={line} className={styles.hoursItem}>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          ) : (
+          {openingHoursSummary === 'Hours unknown' ? (
             <div className={styles.hoursUnknownRow}>
               <p className={styles.hoursUnknown}>Hours unknown</p>
               <button type="button" className={styles.addHoursBtn} onClick={() => setShowHoursForm((v) => !v)}>
                 Add hours ✏️
+              </button>
+            </div>
+          ) : (
+            <div className={styles.hoursKnownRow}>
+              <p className={styles.hoursSummary}>{openingHoursSummary}</p>
+              <button type="button" className={styles.addHoursBtn} onClick={() => setShowHoursForm((v) => !v)}>
+                Edit hours ✏️
               </button>
             </div>
           )}
@@ -826,28 +1221,55 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                   checked={hours24_7}
                   onChange={(e) => setHours24_7(e.target.checked)}
                 />
-                <span>Open 24 hours</span>
+                <span>24 hours / Always open</span>
               </label>
               {!hours24_7 && (
-                <div className={styles.hoursInputs}>
-                  <label>
-                    Open
-                    <input
-                      type="time"
-                      value={hoursOpen}
-                      onChange={(e) => setHoursOpen(e.target.value)}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Close
-                    <input
-                      type="time"
-                      value={hoursClose}
-                      onChange={(e) => setHoursClose(e.target.value)}
-                      required
-                    />
-                  </label>
+                <div className={styles.hoursEditor}>
+                  <div className={styles.daysPillsRow}>
+                    {DAYS.map((day) => (
+                      <button
+                        key={day.key}
+                        type="button"
+                        className={`${styles.dayPill} ${hoursByDay[day.key]?.enabled ? styles.dayPillActive : ''}`}
+                        onClick={() => toggleHoursDay(day.key)}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" className={styles.sameHoursBtn} onClick={applySameHoursEveryDay}>
+                    Same hours every day
+                  </button>
+                  <div className={styles.hoursDayRows}>
+                    {DAYS.filter((d) => hoursByDay[d.key]?.enabled).map((day) => (
+                      <div key={`hours-${day.key}`} className={styles.hoursDayRow}>
+                        <span className={styles.hoursDayLabel}>{day.label}</span>
+                        <select
+                          className={styles.timeSelect}
+                          value={hoursByDay[day.key].open}
+                          onChange={(e) => setHoursValue(day.key, 'open', e.target.value)}
+                        >
+                          {TIME_OPTIONS.map((time) => (
+                            <option key={`${day.key}-open-${time}`} value={time}>
+                              {time}
+                            </option>
+                          ))}
+                        </select>
+                        <span className={styles.timeDivider}>to</span>
+                        <select
+                          className={styles.timeSelect}
+                          value={hoursByDay[day.key].close}
+                          onChange={(e) => setHoursValue(day.key, 'close', e.target.value)}
+                        >
+                          {TIME_OPTIONS.map((time) => (
+                            <option key={`${day.key}-close-${time}`} value={time}>
+                              {time}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <button type="submit" className={styles.submit} disabled={savingHours}>
@@ -856,15 +1278,81 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
             </form>
           )}
 
-          {toilet.access_code && (
-            <div className={styles.codeBox}>
-              <p className={styles.codeLabel}>Access code</p>
-              <div className={styles.codeRow}>
-                <code className={styles.codeValue}>{toilet.access_code}</code>
+          <div className={styles.inlineSuggest}>
+            {accessState === 'unknown' && <span>🔑 Access code unknown</span>}
+            {accessState === 'no_code' && <span>🔓 No access code needed</span>}
+            {accessState === 'code_set' && (
+              <>
+                <span>🔑 Code: {toilet.access_code}</span>
                 <button type="button" className={styles.codeCopyBtn} onClick={copyAccessCode}>
-                  {copiedCode ? 'Copied! ✓' : 'Copy code'}
+                  {copiedCode ? 'Copied! ✓' : 'Copy'}
+                </button>
+              </>
+            )}
+            {accessState === 'code_required' && <span>🔑 Requires access code</span>}
+            {!accessEditOpen ? (
+              <button type="button" onClick={openAccessEditor}>
+                {accessState === 'code_required' ? 'Add code ✏️' : accessState === 'unknown' ? 'Add this ✏️' : 'Edit ✏️'}
+              </button>
+            ) : (
+              <div className={styles.inlineSuggestForm}>
+                <div className={styles.verifyActions}>
+                  <button
+                    type="button"
+                    className={accessMode === 'none' ? styles.segBtnActive : ''}
+                    onClick={() => setAccessMode('none')}
+                  >
+                    No code needed
+                  </button>
+                  <button
+                    type="button"
+                    className={accessMode === 'code' ? styles.segBtnActive : ''}
+                    onClick={() => setAccessMode('code')}
+                  >
+                    Code required
+                  </button>
+                </div>
+                {accessMode === 'code' && (
+                  <input
+                    value={accessCodeDraft}
+                    onChange={(e) => setAccessCodeDraft(e.target.value)}
+                    placeholder="Access code"
+                  />
+                )}
+                <button type="button" disabled={savingSuggestion} onClick={saveAccessSettings}>
+                  Save
                 </button>
               </div>
+            )}
+          </div>
+          {!locationType && (
+            <div className={styles.inlineSuggest}>
+              <span>Where is this? (e.g. Train Station, Shopping Centre)</span>
+              {!suggestLocationTypeOpen ? (
+                <button type="button" onClick={() => setSuggestLocationTypeOpen(true)}>
+                  Add this ✏️
+                </button>
+              ) : (
+                <div className={styles.inlineSuggestForm}>
+                  <select value={suggestLocationTypeValue} onChange={(e) => setSuggestLocationTypeValue(e.target.value)}>
+                    {LOCATION_TYPE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={savingSuggestion}
+                    onClick={() => {
+                      saveSuggestion({ location_type: suggestLocationTypeValue })
+                      setSuggestLocationTypeOpen(false)
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -894,7 +1382,72 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
             <ul className={styles.reviewList}>
               {reviews.map((r) => (
                 <li key={r.id} className={styles.reviewCard}>
-                  {r.user_id && reviewerMeta[r.user_id] ? (
+                  {editingReviewId === r.id && editingReviewValues ? (
+                    <div className={styles.inlineEditReview}>
+                      <p className={styles.fieldLabel}>Overall rating</p>
+                      <div className={styles.starPicker}>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button
+                            key={`edit-overall-${n}`}
+                            type="button"
+                            className={`${styles.starBtn} ${n <= editingReviewValues.overall_rating ? styles.starBtnActive : ''}`}
+                            onClick={() => setEditingReviewValues((prev) => ({ ...prev, overall_rating: n }))}
+                          >
+                            <StarIcon filled={n <= editingReviewValues.overall_rating} />
+                          </button>
+                        ))}
+                      </div>
+                      <p className={styles.fieldLabel}>Cleanliness</p>
+                      <div className={styles.starPicker}>
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button
+                            key={`edit-clean-${n}`}
+                            type="button"
+                            className={`${styles.starBtn} ${n <= editingReviewValues.cleanliness ? styles.starBtnActive : ''}`}
+                            onClick={() => setEditingReviewValues((prev) => ({ ...prev, cleanliness: n }))}
+                          >
+                            <StarIcon filled={n <= editingReviewValues.cleanliness} />
+                          </button>
+                        ))}
+                      </div>
+                      <div className={styles.seg} role="group">
+                        <button
+                          type="button"
+                          className={`${styles.segBtn} ${editingReviewValues.ibd_friendly ? styles.segBtnActive : ''}`}
+                          onClick={() => setEditingReviewValues((prev) => ({ ...prev, ibd_friendly: true }))}
+                        >
+                          Quick access: Yes
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.segBtn} ${!editingReviewValues.ibd_friendly ? styles.segBtnActive : ''}`}
+                          onClick={() => setEditingReviewValues((prev) => ({ ...prev, ibd_friendly: false }))}
+                        >
+                          Quick access: No
+                        </button>
+                      </div>
+                      <textarea
+                        className={styles.textarea}
+                        rows={3}
+                        value={editingReviewValues.comment}
+                        onChange={(e) => setEditingReviewValues((prev) => ({ ...prev, comment: e.target.value }))}
+                      />
+                      <div className={styles.verifyActions}>
+                        <button type="button" onClick={() => saveEditedReview(r.id)} disabled={savingReviewEdit}>
+                          {savingReviewEdit ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingReviewId(null)
+                            setEditingReviewValues(null)
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : r.user_id && reviewerMeta[r.user_id] ? (
                     <p className={styles.reviewerSays}>
                       <span className={styles.reviewerTag}>
                         {reviewerMeta[r.user_id].emoji} {reviewerMeta[r.user_id].title} says:
@@ -931,7 +1484,7 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                       )}
                       {r.ibd_friendly != null && (
                         <span className={styles.facilityChip}>
-                          Desperate friendly: {r.ibd_friendly ? 'Yes' : 'No'}
+                          Quick access: {r.ibd_friendly ? 'Yes' : 'No'}
                         </span>
                       )}
                     </p>
@@ -963,10 +1516,16 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                         : `Helpful · ${Number(r.helpful_count) || 0}`}
                     </button>
                   )}
+                  {user && r.user_id === user.id && editingReviewId !== r.id && (
+                    <button type="button" className={styles.helpfulBtn} onClick={() => startEditReview(r)}>
+                      Edit ✏️
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+          {quickAccessCount > 0 && <p className={styles.savedCountLine}>🙌 {quickAccessCount} people were saved here</p>}
           <button
             type="button"
             className={styles.savedBtn}
@@ -1074,7 +1633,10 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                   </div>
                   <div>
                     <p className={styles.fieldLabel} id="ibd-friendly-label">
-                      Desperate Friendly?
+                      Quick access?
+                    </p>
+                    <p className={styles.photoUploadHint}>
+                      Would you recommend this in an emergency? Quick to find, no queue, accessible.
                     </p>
                     <div className={styles.seg} role="group" aria-labelledby="ibd-friendly-label">
                       <button

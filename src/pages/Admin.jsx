@@ -10,12 +10,14 @@ function Admin() {
   const [reports, setReports] = useState([])
   const [toilets, setToilets] = useState([])
   const [stats, setStats] = useState({ toilets: 0, reviews: 0, users: 0, reports: 0 })
+  const [closedToilets, setClosedToilets] = useState([])
 
   const load = useCallback(async () => {
-    const [{ data: reportsData }, { data: toiletsData }, reviewsCountRes, toiletsCountRes, usersCountRes, reportsCountRes] =
+    const [{ data: reportsData }, { data: toiletsData }, { data: closedData }, reviewsCountRes, toiletsCountRes, usersCountRes, reportsCountRes] =
       await Promise.all([
-        supabase.from('reports').select('id, toilet_id, user_id, reason, details, created_at').order('created_at', { ascending: false }),
-        supabase.from('toilets').select('id, name, created_at').order('created_at', { ascending: false }).limit(40),
+        supabase.from('reports').select('id, toilet_id, user_id, reason, details, created_at, pending_review, confirmed_count, dismissed_count').order('created_at', { ascending: false }),
+        supabase.from('toilets').select('id, name, created_at, is_closed').order('created_at', { ascending: false }).limit(40),
+        supabase.from('toilets').select('id, name, created_at').eq('is_closed', true).order('created_at', { ascending: false }),
         supabase.from('reviews').select('*', { count: 'exact', head: true }),
         supabase.from('toilets').select('*', { count: 'exact', head: true }),
         supabase.from('user_points').select('*', { count: 'exact', head: true }),
@@ -25,6 +27,7 @@ function Admin() {
     const toiletsById = Object.fromEntries((toiletsData || []).map((t) => [t.id, t.name || 'Unnamed WC']))
     setReports((reportsData || []).map((r) => ({ ...r, toiletName: toiletsById[r.toilet_id] || 'Unknown WC' })))
     setToilets(toiletsData || [])
+    setClosedToilets(closedData || [])
     setStats({
       toilets: toiletsCountRes.count ?? 0,
       reviews: reviewsCountRes.count ?? 0,
@@ -63,6 +66,11 @@ function Admin() {
 
   const removeToilet = async (id) => {
     await supabase.from('toilets').delete().eq('id', id)
+    await load()
+  }
+
+  const reinstateToilet = async (id) => {
+    await supabase.from('toilets').update({ is_closed: false }).eq('id', id)
     await load()
   }
 
@@ -108,6 +116,20 @@ function Admin() {
             <button type="button" onClick={() => removeToilet(t.id)}>Remove listing</button>
           </div>
         ))}
+      </section>
+
+      <section className={styles.card}>
+        <h2>Closed toilets for manual review</h2>
+        {closedToilets.length === 0 ? (
+          <p>No closed toilets currently flagged.</p>
+        ) : (
+          closedToilets.map((t) => (
+            <div key={t.id} className={styles.item}>
+              <p>{t.name || 'Unnamed WC'}</p>
+              <button type="button" onClick={() => reinstateToilet(t.id)}>Reinstate listing</button>
+            </div>
+          ))
+        )}
       </section>
     </div>
   )

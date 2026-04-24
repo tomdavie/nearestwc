@@ -123,12 +123,14 @@
 }
 
 .optionTitle {
+  display: block;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-text);
 }
 
 .optionDesc {
+  display: block;
   font-size: 13px;
   color: var(--color-text-muted);
   margin-top: 2px;

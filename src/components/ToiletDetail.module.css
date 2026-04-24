@@ -310,6 +310,19 @@
   margin-bottom: 10px;
 }
 
+.locationTypeBadge {
+  margin: -6px 0 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.savedCountLine {
+  margin: -8px 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #137333;
+}
+
 .ibdBadge {
   margin: -4px 0 12px;
   padding: 8px 10px;
@@ -494,6 +507,90 @@
   margin-bottom: 14px;
 }
 
+.hoursKnownRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.hoursSummary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.inlineSuggest {
+  margin: -2px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.inlineSuggest button {
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.inlineSuggestForm {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.inlineSuggestForm input,
+.inlineSuggestForm select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.inlineEditReview {
+  display: grid;
+  gap: 8px;
+}
+
+.verifyBanner {
+  border: 1px solid rgba(217, 48, 37, 0.25);
+  background: rgba(217, 48, 37, 0.08);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.verifyBanner p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #9f1d1d;
+}
+
+.verifyActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.verifyActions button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 7px 10px;
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .addHoursBtn {
   border: none;
   background: transparent;
@@ -512,6 +609,81 @@
   display: grid;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.hoursEditor {
+  display: grid;
+  gap: 10px;
+}
+
+.daysPillsRow {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.dayPill {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.dayPillActive {
+  border-color: rgba(26, 115, 232, 0.4);
+  background: rgba(26, 115, 232, 0.1);
+  color: var(--color-primary);
+}
+
+.sameHoursBtn {
+  border: 1px solid rgba(26, 115, 232, 0.35);
+  background: rgba(26, 115, 232, 0.06);
+  color: var(--color-primary);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  justify-self: start;
+  cursor: pointer;
+}
+
+.hoursDayRows {
+  display: grid;
+  gap: 8px;
+}
+
+.hoursDayRow {
+  display: grid;
+  grid-template-columns: 36px 1fr auto 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.hoursDayLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.timeDivider {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.timeSelect {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 13px;
+  padding: 7px 8px;
 }
 
 .toggleRow {

@@ -11,6 +11,16 @@ import styles from './AddToilet.module.css'
 
 const defaultCenter = { lat: 51.505, lng: -0.09 }
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const LOCATION_TYPE_OPTIONS = [
+  'Train Station',
+  'Shopping Centre',
+  'Airport',
+  'Park',
+  'Restaurant/Café',
+  'Hotel',
+  'Street/Public',
+  'Other',
+]
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const hours = String(Math.floor(i / 2)).padStart(2, '0')
   const minutes = i % 2 === 0 ? '00' : '30'
@@ -37,6 +47,7 @@ function AddToilet() {
   const [cost, setCost] = useState('')
   const [isAccessible, setIsAccessible] = useState(false)
   const [babyChanging, setBabyChanging] = useState(false)
+  const [locationType, setLocationType] = useState('Street/Public')
   const [user, setUser] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [celebrate, setCelebrate] = useState(false)
@@ -112,19 +123,27 @@ function AddToilet() {
       showToast('Wait for your location or move the map pin.', 'info')
       return
     }
-    const openingHoursPayload = isTwentyFourHours
-      ? { mode: '24_7' }
-      : {
-          mode: 'scheduled',
-          closed_on_unlisted_days: true,
-          days: DAYS.filter((day) => openingHours[day].enabled).reduce((acc, day) => {
-            acc[day] = {
-              open: openingHours[day].open,
-              close: openingHours[day].close,
-            }
-            return acc
-          }, {}),
-        }
+    const keyByDay = {
+      Mon: 'mon',
+      Tue: 'tue',
+      Wed: 'wed',
+      Thu: 'thu',
+      Fri: 'fri',
+      Sat: 'sat',
+      Sun: 'sun',
+    }
+    const openingHoursPayload = {
+      is24hours: Boolean(isTwentyFourHours),
+      days: DAYS.reduce((acc, day) => {
+        const key = keyByDay[day]
+        const dayHours = openingHours[day]
+        acc[key] =
+          !isTwentyFourHours && dayHours?.enabled
+            ? { open: dayHours.open, close: dayHours.close }
+            : null
+        return acc
+      }, {}),
+    }
     let toiletPhotoUrl = null
     if (toiletPhoto) {
       try {
@@ -176,6 +195,7 @@ function AddToilet() {
           baby_changing: babyChanging,
           opening_hours: JSON.stringify(openingHoursPayload),
           access_code,
+          location_type: locationType,
           description: description.trim() || null,
           photo_url: toiletPhotoUrl,
         },
@@ -442,6 +462,21 @@ function AddToilet() {
 
         <div className={styles.card}>
           <span className={styles.cardLabel}>Details</span>
+          <label className={styles.costLabel} htmlFor="location-type">
+            Location type
+          </label>
+          <select
+            id="location-type"
+            className={styles.accessSelect}
+            value={locationType}
+            onChange={(e) => setLocationType(e.target.value)}
+          >
+            {LOCATION_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
           <div className={styles.paymentBlock}>
             <p className={styles.optionTitle}>Payment</p>
             <div className={styles.paymentPillsRow}>

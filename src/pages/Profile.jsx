@@ -22,6 +22,17 @@ function hasBowelCondition(conditionProfile) {
   )
 }
 
+function formatReviewDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 function Profile() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
@@ -51,10 +62,10 @@ function Profile() {
         .maybeSingle(),
       supabase
         .from('reviews')
-        .select('id, comment, overall_rating, rating, created_at, toilet_id')
+        .select('*, toilets(name)')
         .eq('user_id', uid)
         .order('created_at', { ascending: false })
-        .limit(5),
+        .limit(10),
       Promise.all([
         supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('user_id', uid),
         supabase.from('toilets').select('*', { count: 'exact', head: true }).eq('added_by', uid),
@@ -73,13 +84,12 @@ function Profile() {
     setToiletCount(Number(pointsData?.toilet_count) || toiletFallbackCount)
 
     const rows = reviewsRes.data || []
-    const toiletIds = [...new Set(rows.map((r) => r.toilet_id).filter(Boolean))]
-    let toiletNames = {}
-    if (toiletIds.length > 0) {
-      const { data: toilets } = await supabase.from('toilets').select('id, name').in('id', toiletIds)
-      toiletNames = Object.fromEntries((toilets || []).map((t) => [t.id, t.name]))
-    }
-    setRecentReviews(rows.map((r) => ({ ...r, toiletName: toiletNames[r.toilet_id] || 'Unknown WC' })))
+    setRecentReviews(
+      rows.map((r) => ({
+        ...r,
+        toiletName: r.toilets?.name || 'Unknown WC',
+      })),
+    )
 
     const savedIds = Array.isArray(pointsData?.saved_toilets) ? pointsData.saved_toilets.filter(Boolean) : []
     if (!savedIds.length) {
@@ -311,16 +321,18 @@ function Profile() {
 
       <h2 className={styles.sectionTitle}>Your Reviews</h2>
       {recentReviews.length === 0 ? (
-        <p className={styles.muted}>No reviews yet. Your clipboard awaits.</p>
+        <p className={styles.muted}>No reviews yet - be the first to rate a toilet! 🚽</p>
       ) : (
         <ul className={styles.feed}>
           {recentReviews.map((review) => {
-            const stars = Number(review.overall_rating ?? review.rating) || 0
+            const stars = Math.max(0, Math.min(5, Math.round(Number(review.overall_rating ?? review.rating) || 0)))
+            const reviewDate = formatReviewDate(review.created_at)
             return (
               <li key={review.id} className={styles.feedCard}>
                 <p className={styles.feedMeta}>{review.toiletName}</p>
                 <p className={styles.feedBody}>{'⭐'.repeat(stars)} ({stars}/5)</p>
                 <p className={styles.feedBody}>{review.comment || 'No comment left.'}</p>
+                {reviewDate && <p className={styles.feedMeta}>{reviewDate}</p>}
               </li>
             )
           })}

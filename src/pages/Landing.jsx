@@ -42,12 +42,18 @@ function Landing() {
 
   return (
     <div style={{ width: '100%', color: '#1f2937', background: '#ffffff' }}>
+      <style>{`
+        @keyframes landingBounceDown {
+          0%, 100% { transform: translateY(0); opacity: 0.75; }
+          50% { transform: translateY(6px); opacity: 1; }
+        }
+      `}</style>
       <section
         style={{
-          ...sectionBase,
-          minHeight: '100dvh',
-          paddingTop: 'max(80px, calc(env(safe-area-inset-top) + 60px))',
-          paddingBottom: isMobile ? '36px' : '52px',
+          minHeight: '100svh',
+          display: 'flex',
+          flexDirection: 'column',
+          paddingTop: 'env(safe-area-inset-top)',
           background: '#1a73e8',
           color: '#ffffff',
           position: 'relative',
@@ -63,15 +69,26 @@ function Landing() {
             pointerEvents: 'none',
           }}
         />
-        <div style={{ ...container, position: 'relative', zIndex: 2 }}>
+        <div
+          style={{
+            ...container,
+            position: 'relative',
+            zIndex: 2,
+            width: '100%',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '0 24px',
+          }}
+        >
           <header
             style={{
               display: 'flex',
               flexDirection: isMobile ? 'column' : 'row',
-              alignItems: isMobile ? 'flex-start' : 'center',
+              alignItems: 'center',
               justifyContent: 'space-between',
               gap: '14px',
-              paddingTop: 'max(12px, env(safe-area-inset-top))',
+              padding: isMobile ? '20px 0' : '24px 0',
             }}
           >
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontWeight: 800 }}>
@@ -92,11 +109,12 @@ function Landing() {
               </span>
               <span style={{ fontSize: '20px', letterSpacing: '-0.01em' }}>NearestWC</span>
             </div>
-            <div style={{ display: 'flex', width: isMobile ? '100%' : 'auto', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
               <Link
                 to="/login"
                 style={{
                   ...buttonBase,
+                  width: isMobile ? '100%' : 'auto',
                   fontWeight: 600,
                   color: '#ffffff',
                   border: '1px solid rgba(255,255,255,0.45)',
@@ -108,6 +126,7 @@ function Landing() {
                 to="/login"
                 style={{
                   ...buttonBase,
+                  width: isMobile ? '100%' : 'auto',
                   color: '#1a73e8',
                   background: '#ffffff',
                 }}
@@ -119,88 +138,85 @@ function Landing() {
 
           <div
             style={{
-              marginTop: isMobile ? '36px' : '58px',
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'minmax(320px, 1fr) minmax(300px, 440px)',
-              gap: '24px',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
+              paddingBottom: '15vh',
+              textAlign: 'center',
+              width: '100%',
             }}
           >
-            <div style={{ textAlign: isMobile ? 'center' : 'left' }}>
-              <h1
+            <h1
+              style={{
+                fontSize: isMobile ? '38px' : 'clamp(44px, 6vw, 64px)',
+                lineHeight: 1.03,
+                letterSpacing: '-0.02em',
+                marginBottom: '16px',
+              }}
+            >
+              When nature calls... answer it.
+            </h1>
+            <p
+              style={{
+                fontSize: isMobile ? '20px' : 'clamp(18px, 2.2vw, 23px)',
+                lineHeight: 1.5,
+                color: 'rgba(255, 255, 255, 0.94)',
+                maxWidth: '620px',
+                marginBottom: isMobile ? '24px' : '28px',
+              }}
+            >
+              The community-powered map of public toilets worldwide. Find them, rate them, and never
+              be caught short again.
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: '12px',
+                width: isMobile ? '100%' : 'auto',
+              }}
+            >
+              <Link
+                to="/login"
                 style={{
-                  fontSize: isMobile ? '36px' : 'clamp(44px, 6vw, 64px)',
-                  lineHeight: 1.03,
-                  letterSpacing: '-0.02em',
-                  marginBottom: '16px',
+                  ...buttonBase,
+                  color: '#1a73e8',
+                  background: '#ffffff',
                 }}
               >
-                When nature calls... answer it.
-              </h1>
-              <p
+                Find a WC now 🚽
+              </Link>
+              <a
+                href="#how-it-works"
                 style={{
-                  fontSize: isMobile ? '20px' : 'clamp(18px, 2.2vw, 23px)',
-                  lineHeight: 1.5,
-                  color: 'rgba(255, 255, 255, 0.94)',
-                  maxWidth: '620px',
-                  marginBottom: '28px',
+                  ...buttonBase,
+                  color: '#ffffff',
+                  border: '1px solid rgba(255,255,255,0.55)',
                 }}
               >
-                The community-powered map of public toilets worldwide. Find them, rate them, and never
-                be caught short again.
-              </p>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px' }}>
-                <Link
-                  to="/login"
-                  style={{
-                    ...buttonBase,
-                    color: '#1a73e8',
-                    background: '#ffffff',
-                  }}
-                >
-                  Find a WC now 🚽
-                </Link>
-                <a
-                  href="#how-it-works"
-                  style={{
-                    ...buttonBase,
-                    color: '#ffffff',
-                    border: '1px solid rgba(255,255,255,0.55)',
-                  }}
-                >
-                  See how it works
-                </a>
-              </div>
+                See how it works
+              </a>
             </div>
-
-            {!isMobile && (
-              <div style={{ display: 'grid', placeItems: 'center' }} aria-hidden>
-                <div
-                  style={{
-                    width: '260px',
-                    height: '520px',
-                    background: '#1a1a1a',
-                    borderRadius: '36px',
-                    padding: '12px',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-                    border: '2px solid #333',
-                    flexShrink: 0,
-                  }}
-                >
-                  <img
-                    src="/app-screenshot.png"
-                    alt="NearestWC app"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      borderRadius: '26px',
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
+          <a
+            href="#how-it-works"
+            aria-label="Scroll down"
+            style={{
+              position: 'absolute',
+              bottom: isMobile ? '18px' : '24px',
+              left: '50%',
+              translate: '-50% 0',
+              color: 'rgba(255,255,255,0.9)',
+              textDecoration: 'none',
+              fontSize: '22px',
+              lineHeight: 1,
+              animation: 'landingBounceDown 1.4s ease-in-out infinite',
+            }}
+          >
+            ⌄
+          </a>
         </div>
       </section>
 
@@ -398,9 +414,9 @@ function Landing() {
               </p>
             </article>
             <article style={{ ...cardStyle, background: '#f8fafc', border: '1px solid #e7edf8' }}>
-              <h3 style={{ marginBottom: '10px', fontSize: '19px' }}>Safe route planning</h3>
+              <h3 style={{ marginBottom: '10px', fontSize: '19px' }}>🗺️ Route Planning</h3>
               <p style={{ lineHeight: 1.55 }}>
-                Map journeys with confidence using trusted toilet stops along the way.
+                map toilets along your journey before you leave. Coming soon.
               </p>
             </article>
           </div>
@@ -418,7 +434,7 @@ function Landing() {
           </p>
           <ul style={{ paddingLeft: '18px', lineHeight: 1.7, marginBottom: '18px' }}>
             <li>Urgent Mode with one-tap toilet directions</li>
-            <li>Safe Route toilet planning</li>
+            <li>🗺️ Route Planning (coming soon)</li>
             <li>Pro badges and priority feature access</li>
             <li>Support development for people who rely on this every day</li>
           </ul>
