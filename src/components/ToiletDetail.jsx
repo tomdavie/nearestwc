@@ -948,17 +948,21 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   }
 
   const saveAccessSettings = async () => {
+    console.log('saveAccessSettings called, mode:', accessMode)
     if (accessMode === 'code' && !accessCodeDraft.trim()) {
       showToast('Please enter an access code or choose no code needed.', 'error')
       return
     }
-    const patch =
-      accessMode === 'none'
-        ? { requires_key: false, access_code: null }
-        : { requires_key: true, access_code: accessCodeDraft.trim() }
-    await saveSuggestion(patch)
+
+    if (accessMode === 'none') {
+      await saveSuggestion({ requires_key: false, access_code: null })
+      setAccessEditOpen(false)
+      setAccessCodeDraft('')
+      return
+    }
+
+    await saveSuggestion({ requires_key: true, access_code: accessCodeDraft.trim() })
     setAccessEditOpen(false)
-    if (patch.requires_key === false) setAccessCodeDraft('')
   }
 
   const submitReport = async (e) => {
