@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  GoogleMap,
-  useJsApiLoader,
-  AdvancedMarker,
-  MarkerClustererF,
-} from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, Marker, MarkerClustererF } from '@react-google-maps/api'
 import { supabase } from '../supabaseClient'
 import ToiletDetail from '../components/ToiletDetail'
 import UrgentMode from '../components/UrgentMode'
@@ -36,56 +31,53 @@ function haversineMeters(aLat, aLng, bLat, bLng) {
   return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x))
 }
 
-function getMarkerColor(avgRating) {
-  return avgRating >= 4 ? '#22c55e' : avgRating >= 3 ? '#f59e0b' : avgRating > 0 ? '#ef4444' : '#9ca3af'
-}
-
-function WcCircleMarker({ avgRating, highlighted = false }) {
-  const color = highlighted ? '#d93025' : getMarkerColor(avgRating)
-  return (
-    <div
-      style={{
-        width: highlighted ? '52px' : '40px',
-        height: highlighted ? '52px' : '40px',
-        borderRadius: '999px',
-        background: color,
-        color: '#ffffff',
-        display: 'grid',
-        placeItems: 'center',
-        fontSize: highlighted ? '14px' : '12px',
-        fontWeight: 700,
-        fontFamily: 'Arial, sans-serif',
-        border: '2px solid #ffffff',
-        boxShadow: highlighted ? '0 0 0 3px rgba(217, 48, 37, 0.45)' : '0 2px 6px rgba(0,0,0,0.2)',
-      }}
-    >
-      WC
-    </div>
-  )
-}
-
-function SponsoredMarkerSvg({ highlighted = false }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48" aria-hidden>
-      <path
-        d="M18 0 C8.06 0 0 8.06 0 18 C0 31.5 18 48 18 48 C18 48 36 31.5 36 18 C36 8.06 27.94 0 18 0 Z"
-        fill="#F59E0B"
-        stroke="#ffffff"
-        strokeWidth="2"
-      />
-      {highlighted && (
-        <path
-          d="M18 1.2 C8.75 1.2 1.2 8.75 1.2 18 C1.2 24.08 5.4 31.18 9.95 36.74 C13.51 41.1 16.97 44.26 18 45.17 C19.03 44.26 22.49 41.1 26.05 36.74 C30.6 31.18 34.8 24.08 34.8 18 C34.8 8.75 27.25 1.2 18 1.2 Z"
-          fill="none"
-          stroke="#d93025"
-          strokeWidth="2.5"
-        />
-      )}
-      <text x="18" y="22" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">
-        WC
-      </text>
+function getMarkerIcon(avgRating) {
+  const color =
+    avgRating >= 4 ? '#22c55e' : avgRating >= 3 ? '#f59e0b' : avgRating > 0 ? '#ef4444' : '#9ca3af'
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="2"/>
+      <text x="20" y="25" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="Arial, sans-serif">WC</text>
     </svg>
-  )
+  `
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(40, 40),
+    anchor: new window.google.maps.Point(20, 20),
+  }
+}
+
+function getSponsoredMarkerIcon() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+      <path d="M18 0 C8.06 0 0 8.06 0 18 C0 31.5 18 48 18 48 C18 48 36 31.5 36 18 C36 8.06 27.94 0 18 0 Z" fill="#F59E0B" stroke="white" stroke-width="2"/>
+      <text x="18" y="22" text-anchor="middle" fill="white" font-size="11" font-weight="bold" font-family="Arial, sans-serif">WC</text>
+    </svg>
+  `
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(36, 48),
+    anchor: new window.google.maps.Point(18, 48)
+  }
+}
+
+function getIbdHighlightedIcon(isSponsored) {
+  const fill = isSponsored ? '#F59E0B' : '#d93025'
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="23" fill="${fill}" stroke="white" stroke-width="2.5" />
+      <circle cx="26" cy="26" r="24.5" fill="none" stroke="#d93025" stroke-width="2.5" opacity="0.95">
+        <animate attributeName="r" values="23;25.5;23" dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.95;0.3;0.95" dur="1.2s" repeatCount="indefinite" />
+      </circle>
+      <text x="26" y="31" text-anchor="middle" fill="white" font-size="13" font-weight="bold" font-family="Arial, sans-serif">WC</text>
+    </svg>
+  `
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new window.google.maps.Size(52, 52),
+    anchor: new window.google.maps.Point(26, 26),
+  }
 }
 /** Single solid blue disk for MarkerClustererPlus — text is drawn by the clusterer, not baked into the image. */
 function createClusterBackgroundIconUrl() {
@@ -134,7 +126,6 @@ function MapView() {
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
-    libraries: ['places', 'marker'],
   })
 
   useEffect(() => {
@@ -588,18 +579,20 @@ function MapView() {
                 const isClosestIbd = Boolean(ibdMode && closestToiletId && toilet.id === closestToiletId)
                 console.log('rendering marker for toilet:', toilet.id, 'is sponsored:', isSponsored)
                 return (
-                  <AdvancedMarker
+                  <Marker
                     key={toilet.id}
                     clusterer={clusterer}
                     position={{ lat: toilet.lat, lng: toilet.lng }}
                     onClick={() => handleMarkerClick(toilet, sponsoredListing)}
-                  >
-                    {isSponsored ? (
-                      <SponsoredMarkerSvg highlighted={isClosestIbd} />
-                    ) : (
-                      <WcCircleMarker avgRating={toilet.average_rating} highlighted={isClosestIbd} />
-                    )}
-                  </AdvancedMarker>
+                    options={{ optimized: false }}
+                    icon={
+                      isClosestIbd
+                        ? getIbdHighlightedIcon(isSponsored)
+                        : isSponsored
+                          ? getSponsoredMarkerIcon()
+                          : getMarkerIcon(toilet.average_rating)
+                    }
+                  />
                 )
               })()
             ))
