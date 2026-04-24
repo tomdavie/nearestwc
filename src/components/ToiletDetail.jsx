@@ -734,6 +734,20 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       showToast('Please log in to suggest an edit.', 'info')
       return
     }
+
+    const hasChanges = Object.keys(patch).some((key) => {
+      const next = patch[key]
+      const current = toilet?.[key]
+      if (typeof next === 'string' || typeof current === 'string') {
+        return String(current ?? '').trim() !== String(next ?? '').trim()
+      }
+      return current !== next
+    })
+    if (!hasChanges) {
+      showToast('No changes to save', 'info')
+      return
+    }
+
     setSavingSuggestion(true)
     const { data, error } = await supabase
       .from('toilets')
@@ -1303,14 +1317,14 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                 <div className={styles.verifyActions}>
                   <button
                     type="button"
-                    className={accessMode === 'none' ? styles.segBtnActive : ''}
+                    className={`${styles.segBtn} ${accessMode === 'none' ? styles.segBtnActive : ''}`}
                     onClick={() => setAccessMode('none')}
                   >
                     No code needed
                   </button>
                   <button
                     type="button"
-                    className={accessMode === 'code' ? styles.segBtnActive : ''}
+                    className={`${styles.segBtn} ${accessMode === 'code' ? styles.segBtnActive : ''}`}
                     onClick={() => setAccessMode('code')}
                   >
                     Code required
