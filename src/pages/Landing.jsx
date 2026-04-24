@@ -217,7 +217,7 @@ function Landing() {
               fontSize: '14px',
             }}
           >
-            <span>100,000+ toilets mapped globally</span>
+            <span>350,000+ toilets mapped globally</span>
             <span>Community reviewed</span>
             <span>Free to use</span>
           </div>

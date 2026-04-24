@@ -530,6 +530,7 @@ function MapView() {
     <div className={styles.root}>
       <GoogleMap
         mapContainerClassName={styles.map}
+        mapContainerStyle={{ height: '100%' }}
         center={userLocation || defaultCenter}
         zoom={15}
         onLoad={(instance) => {

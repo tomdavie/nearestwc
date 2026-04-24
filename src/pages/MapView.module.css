@@ -140,7 +140,7 @@
 .fab {
   position: absolute;
   right: calc(env(safe-area-inset-right, 0px) + 24px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   z-index: 10;
   width: 52px;
   height: 52px;
@@ -168,7 +168,7 @@
 .locateBtn {
   position: absolute;
   left: calc(env(safe-area-inset-left, 0px) + 24px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   z-index: 10;
   width: 52px;
   height: 52px;
@@ -190,7 +190,7 @@
 .ibdQuickBtn {
   position: absolute;
   left: calc(env(safe-area-inset-left, 0px) + 84px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+  bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px));
   z-index: 10;
   width: 44px;
   height: 44px;

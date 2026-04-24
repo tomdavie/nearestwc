@@ -72,7 +72,7 @@ function Navbar() {
   const accountLabel = useMemo(() => (sessionUser ? 'Profile' : 'Login'), [sessionUser])
 
   return (
-    <header className={styles.nav}>
+    <header className={styles.nav} style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
       <Link to="/" className={styles.brand}>
         <span className={styles.mark} aria-hidden>
           W
