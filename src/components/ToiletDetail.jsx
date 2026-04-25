@@ -211,6 +211,62 @@ function hasBowelCondition(conditionProfile) {
   )
 }
 
+const COMMUNITY_TOILET_KEYS = [
+  'name',
+  'is_free',
+  'cost',
+  'accepts_cash',
+  'accepts_card',
+  'is_accessible',
+  'baby_changing',
+  'radar_key_accepted',
+  'description',
+]
+
+function snapshotToiletForEdit(t) {
+  if (!t) return {}
+  return {
+    name: (t.name == null || t.name === '') ? '' : String(t.name).trim(),
+    is_free: Boolean(t.is_free),
+    cost: t.cost == null || t.cost === '' ? null : String(t.cost).trim(),
+    accepts_cash: Boolean(t.accepts_cash),
+    accepts_card: Boolean(t.accepts_card),
+    is_accessible: Boolean(t.is_accessible),
+    baby_changing: Boolean(t.baby_changing),
+    radar_key_accepted: Boolean(t.radar_key_accepted),
+    description: t.description == null || t.description === '' ? null : String(t.description).trim(),
+  }
+}
+
+function buildDesiredToiletFromForm(f) {
+  const isFree = Boolean(f.is_free)
+  const isCash = !isFree && f.payMethod === 'cash'
+  const isCard = !isFree && f.payMethod === 'card'
+  return {
+    name: f.name == null || f.name === '' ? '' : String(f.name).trim(),
+    is_free: isFree,
+    cost: isFree ? null : f.cost == null || String(f.cost).trim() === '' ? null : String(f.cost).trim(),
+    accepts_cash: isFree ? false : isCash,
+    accepts_card: isFree ? false : isCard,
+    is_accessible: Boolean(f.is_accessible),
+    baby_changing: Boolean(f.baby_changing),
+    radar_key_accepted: Boolean(f.radar_key_accepted),
+    description: f.description == null || String(f.description).trim() === '' ? null : String(f.description).trim(),
+  }
+}
+
+function diffCommunityToiletFields(before, after) {
+  const patch = {}
+  for (const key of COMMUNITY_TOILET_KEYS) {
+    const b = before[key]
+    const a = after[key]
+    if (b === a) continue
+    if ((key === 'description' || key === 'cost') && (b == null || b === '') && (a == null || a === '')) continue
+    patch[key] = a
+  }
+  return patch
+}
+
 function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredListing = null }) {
   const { showToast } = useToast()
   const [reviews, setReviews] = useState([])
@@ -268,6 +324,18 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   const [suggestLocationTypeOpen, setSuggestLocationTypeOpen] = useState(false)
   const [suggestLocationTypeValue, setSuggestLocationTypeValue] = useState('Street/Public')
   const [savingSuggestion, setSavingSuggestion] = useState(false)
+  const [toiletEdits, setToiletEdits] = useState([])
+  const [loadingToiletEdits, setLoadingToiletEdits] = useState(false)
+  const [showCommunityEdit, setShowCommunityEdit] = useState(false)
+  const [savingCommunityEdit, setSavingCommunityEdit] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editIsFree, setEditIsFree] = useState(true)
+  const [editPayMethod, setEditPayMethod] = useState('card')
+  const [editCost, setEditCost] = useState('')
+  const [editAccessible, setEditAccessible] = useState(false)
+  const [editBaby, setEditBaby] = useState(false)
+  const [editRadar, setEditRadar] = useState(false)
+  const [editDescription, setEditDescription] = useState('')
   const addressCacheRef = useRef({})
   const reviewPhotoInputRef = useRef(null)
   const dragStartY = useRef(null)
@@ -293,9 +361,57 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
   }, [toilet?.id])
 
   useEffect(() => {
+    setShowCommunityEdit(false)
+  }, [toilet?.id])
+
+  useEffect(() => {
     setOpeningHoursValue(toilet?.opening_hours ?? null)
     setShowHoursForm(false)
   }, [toilet?.id, toilet?.opening_hours])
+
+  const loadToiletEdits = useCallback(async () => {
+    if (!toilet?.id) return
+    setLoadingToiletEdits(true)
+    const { data, error } = await supabase
+      .from('toilet_edits')
+      .select('id, changes, created_at')
+      .eq('toilet_id', toilet.id)
+      .order('created_at', { ascending: false })
+      .limit(12)
+    setLoadingToiletEdits(false)
+    if (error) {
+      console.warn('[ToiletDetail] toilet_edits load', error)
+      setToiletEdits([])
+      return
+    }
+    setToiletEdits(data || [])
+  }, [toilet?.id])
+
+  useEffect(() => {
+    loadToiletEdits()
+  }, [loadToiletEdits])
+
+  const initCommunityForm = useCallback(() => {
+    if (!toilet) return
+    setEditName(toilet.name == null ? '' : String(toilet.name))
+    if (toilet.is_free) {
+      setEditIsFree(true)
+      setEditCost('')
+      setEditPayMethod('card')
+    } else {
+      setEditIsFree(false)
+      setEditCost(toilet.cost == null || toilet.cost === '' ? '' : String(toilet.cost))
+      if (toilet.accepts_cash && !toilet.accepts_card) {
+        setEditPayMethod('cash')
+      } else {
+        setEditPayMethod('card')
+      }
+    }
+    setEditAccessible(Boolean(toilet.is_accessible))
+    setEditBaby(Boolean(toilet.baby_changing))
+    setEditRadar(Boolean(toilet.radar_key_accepted))
+    setEditDescription(toilet.description == null ? '' : String(toilet.description))
+  }, [toilet])
 
   useEffect(() => {
     const normalized = normalizeOpeningHours(openingHoursValue)
@@ -757,6 +873,16 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       .maybeSingle()
     if (!error) {
       Object.assign(toilet, data || patch)
+      const { error: logError } = await supabase.from('toilet_edits').insert({
+        toilet_id: toilet.id,
+        user_id: user.id,
+        changes: patch,
+      })
+      if (logError) {
+        console.warn('[ToiletDetail] toilet_edits insert', logError)
+      } else {
+        await loadToiletEdits()
+      }
       try {
         await incrementUserPoints(user.id, 5)
       } catch {
@@ -767,6 +893,71 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
       showToast(error.message, 'error')
     }
     setSavingSuggestion(false)
+  }
+
+  const handleCommunityEditSubmit = async (e) => {
+    e.preventDefault()
+    if (!user?.id || !toilet?.id) {
+      showToast('Please log in to suggest an edit.', 'info')
+      return
+    }
+    if (!editName.trim()) {
+      showToast('Please enter a name for this listing.', 'error')
+      return
+    }
+    if (!editIsFree && !String(editCost).trim()) {
+      showToast('Please enter a cost, or set the listing to Free.', 'error')
+      return
+    }
+    const before = snapshotToiletForEdit(toilet)
+    const after = buildDesiredToiletFromForm({
+      name: editName,
+      is_free: editIsFree,
+      payMethod: editPayMethod,
+      cost: editCost,
+      is_accessible: editAccessible,
+      baby_changing: editBaby,
+      radar_key_accepted: editRadar,
+      description: editDescription,
+    })
+    const patch = diffCommunityToiletFields(before, after)
+    if (Object.keys(patch).length === 0) {
+      showToast('No changes to save', 'info')
+      return
+    }
+    setSavingCommunityEdit(true)
+    const { data, error } = await supabase
+      .from('toilets')
+      .update(patch)
+      .eq('id', toilet.id)
+      .select()
+      .maybeSingle()
+    if (error) {
+      showToast(error.message, 'error')
+      setSavingCommunityEdit(false)
+      return
+    }
+    Object.assign(toilet, data || patch)
+    const { error: logError } = await supabase.from('toilet_edits').insert({
+      toilet_id: toilet.id,
+      user_id: user.id,
+      changes: patch,
+    })
+    if (logError) {
+      console.warn('[ToiletDetail] toilet_edits insert (community edit)', logError)
+    } else {
+      await loadToiletEdits()
+    }
+    try {
+      await incrementUserPoints(user.id, 5)
+    } catch {
+      // non-blocking
+    }
+    await refreshPoints()
+    notifyUserPointsChanged()
+    showToast('Thanks for improving this listing! +5 points 🏅', 'success')
+    setSavingCommunityEdit(false)
+    track('community_listing_edit', { toilet_id: toilet.id, fields: Object.keys(patch) })
   }
 
   const submitReportVerification = async (verdict) => {
@@ -1138,6 +1329,160 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
               {loadingAddress ? 'Finding address…' : resolvedAddress}
             </button>
           )}
+
+          {user ? (
+            <div className={styles.communityEditBlock}>
+              <button
+                type="button"
+                className={styles.communityEditOpenBtn}
+                onClick={() => {
+                  if (!showCommunityEdit) initCommunityForm()
+                  setShowCommunityEdit((v) => !v)
+                }}
+                aria-expanded={showCommunityEdit}
+              >
+                Edit listing ✏️
+              </button>
+              {showCommunityEdit && (
+                <form className={styles.communityEditForm} onSubmit={handleCommunityEditSubmit}>
+                  <label className={styles.fieldLabel} htmlFor="community-edit-name">
+                    Name
+                  </label>
+                  <input
+                    id="community-edit-name"
+                    className={styles.communityTextInput}
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    autoComplete="off"
+                  />
+
+                  <p className={styles.communityEditSubLabel}>Free or paid</p>
+                  <div className={styles.accessToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${editIsFree ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditIsFree(true)}
+                    >
+                      Free
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${!editIsFree ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditIsFree(false)}
+                    >
+                      Paid
+                    </button>
+                  </div>
+
+                  {!editIsFree && (
+                    <>
+                      <label className={styles.fieldLabel} htmlFor="community-edit-cost">
+                        Cost
+                      </label>
+                      <input
+                        id="community-edit-cost"
+                        className={styles.communityTextInput}
+                        value={editCost}
+                        onChange={(e) => setEditCost(e.target.value)}
+                        placeholder="e.g. 50p, £1"
+                        autoComplete="off"
+                      />
+                      <p className={styles.communityEditSubLabel}>Card or cash</p>
+                      <div className={styles.accessToggle}>
+                        <button
+                          type="button"
+                          className={`${styles.accessToggleBtn} ${editPayMethod === 'card' ? styles.accessToggleBtnActive : ''}`}
+                          onClick={() => setEditPayMethod('card')}
+                        >
+                          Card
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.accessToggleBtn} ${editPayMethod === 'cash' ? styles.accessToggleBtnActive : ''}`}
+                          onClick={() => setEditPayMethod('cash')}
+                        >
+                          Cash
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  <p className={styles.communityEditSubLabel}>Accessible</p>
+                  <div className={styles.accessToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${editAccessible ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditAccessible(true)}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${!editAccessible ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditAccessible(false)}
+                    >
+                      No
+                    </button>
+                  </div>
+
+                  <p className={styles.communityEditSubLabel}>Baby changing</p>
+                  <div className={styles.accessToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${editBaby ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditBaby(true)}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${!editBaby ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditBaby(false)}
+                    >
+                      No
+                    </button>
+                  </div>
+
+                  <p className={styles.communityEditSubLabel}>RADAR key accepted</p>
+                  <div className={styles.accessToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${editRadar ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditRadar(true)}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.accessToggleBtn} ${!editRadar ? styles.accessToggleBtnActive : ''}`}
+                      onClick={() => setEditRadar(false)}
+                    >
+                      No
+                    </button>
+                  </div>
+
+                  <label className={styles.fieldLabel} htmlFor="community-edit-desc">
+                    Description
+                  </label>
+                  <textarea
+                    id="community-edit-desc"
+                    className={styles.textarea}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Optional details"
+                  />
+
+                  <button type="submit" className={styles.submit} disabled={savingCommunityEdit}>
+                    {savingCommunityEdit ? 'Saving…' : 'Save changes'}
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : (
+            <p className={styles.communityEditLoginHint}>Login to edit this listing</p>
+          )}
+
           {showIbdFriendlyBadge && (
             <p className={styles.ibdBadge}>✅ Quick access - recommended in an emergency</p>
           )}
@@ -1371,6 +1716,41 @@ function ToiletDetail({ toilet, onClose, user, isSponsored = false, sponsoredLis
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {loadingToiletEdits && (
+            <p className={styles.editLogHint} role="status">
+              Loading edit history…
+            </p>
+          )}
+          {!loadingToiletEdits && toiletEdits.length > 0 && (
+            <div className={styles.editLog}>
+              <p className={styles.sectionLabel}>Recent community edits</p>
+              <ul className={styles.editLogList}>
+                {toiletEdits.map((entry) => (
+                  <li key={entry.id} className={styles.editLogItem}>
+                    <p className={styles.editLogMeta}>
+                      {entry.created_at
+                        ? new Date(entry.created_at).toLocaleString(undefined, {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })
+                        : 'Edit'}
+                    </p>
+                    <div className={styles.editLogChanges}>
+                      {Object.entries(entry.changes || {}).map(([key, value]) => (
+                        <div key={key} className={styles.editLogLine}>
+                          <span className={styles.editLogKey}>{key}</span>
+                          <span className={styles.editLogValue}>
+                            {value == null || value === '' ? '—' : String(value)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

@@ -3,6 +3,8 @@
 .env.development
 .env.production
 .env*.local
+supabase/
+assets/
 seed-toilets.mjs
 osm-dumps/
 .seed-state/
