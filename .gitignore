@@ -1,4 +1,8 @@
 .env
+.env.local
+.env.development
+.env.production
+.env*.local
 seed-toilets.mjs
 osm-dumps/
 .seed-state/
