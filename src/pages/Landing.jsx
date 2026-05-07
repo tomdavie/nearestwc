@@ -504,6 +504,9 @@ function Landing() {
             <Link to="/advertise" style={{ color: '#c9ddff', textDecoration: 'none' }}>
               Advertise with us
             </Link>
+            <Link to="/support" style={{ color: '#c9ddff', textDecoration: 'none' }}>
+              Help &amp; Support
+            </Link>
           </div>
 
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px' }}>
