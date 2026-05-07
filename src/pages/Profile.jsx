@@ -423,6 +423,22 @@ function Profile() {
         {savingPrefs && <p className={styles.muted}>Saving profile preferences…</p>}
       </div>
 
+      <h2 className={styles.sectionTitle}>App info</h2>
+      <nav className={styles.appInfoLinks} aria-label="App information links">
+        <Link to="/about" className={styles.appInfoLink}>
+          About NearestWC
+        </Link>
+        <Link to="/support" className={styles.appInfoLink}>
+          Help &amp; Support
+        </Link>
+        <Link to="/privacy" className={styles.appInfoLink}>
+          Privacy Policy
+        </Link>
+        <Link to="/terms" className={styles.appInfoLink}>
+          Terms of Service
+        </Link>
+      </nav>
+
       <button type="button" className={styles.logoutBtnBottom} onClick={handleLogout} disabled={loggingOut}>
         {loggingOut ? 'Logging out…' : 'Log out'}
       </button>

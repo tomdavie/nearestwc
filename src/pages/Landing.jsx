@@ -495,6 +495,12 @@ function Landing() {
           </div>
 
           <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+            <Link to="/about" style={{ color: '#c9ddff', textDecoration: 'none' }}>
+              About
+            </Link>
+            <Link to="/support" style={{ color: '#c9ddff', textDecoration: 'none' }}>
+              Help &amp; Support
+            </Link>
             <Link to="/privacy" style={{ color: '#c9ddff', textDecoration: 'none' }}>
               Privacy Policy
             </Link>
@@ -503,9 +509,6 @@ function Landing() {
             </Link>
             <Link to="/advertise" style={{ color: '#c9ddff', textDecoration: 'none' }}>
               Advertise with us
-            </Link>
-            <Link to="/support" style={{ color: '#c9ddff', textDecoration: 'none' }}>
-              Help &amp; Support
             </Link>
           </div>
 

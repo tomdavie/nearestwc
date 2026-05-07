@@ -9,6 +9,7 @@ function Footer() {
         <Link to="/advertise" className={styles.advertiseLink}>
           Advertise with us
         </Link>
+        <Link to="/about">About</Link>
         <Link to="/support">Support</Link>
         <Link to="/privacy">Privacy Policy</Link>
         <Link to="/terms">Terms</Link>

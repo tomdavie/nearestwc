@@ -22,6 +22,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Landing = lazy(() => import('./pages/Landing'))
 const Support = lazy(() => import('./pages/Support'))
+const About = lazy(() => import('./pages/About'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 function AppShell({ isLoggedIn }) {
@@ -33,7 +34,8 @@ function AppShell({ isLoggedIn }) {
     (pathname === '/privacy' ||
       pathname === '/terms' ||
       pathname === '/advertise' ||
-      pathname === '/support')
+      pathname === '/support' ||
+      pathname === '/about')
 
   return (
     <div className={isMap ? styles.shellMap : styles.shell}>
@@ -71,6 +73,7 @@ function AppShell({ isLoggedIn }) {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/about" element={<About />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
